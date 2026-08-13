@@ -1,11 +1,17 @@
 import { useState } from "react";
 
-export function QuantitySelector() {
+interface QuantitySelectorProps {
+  stock: number;
+}
+
+export function QuantitySelector({ stock }: QuantitySelectorProps) {
 
   const [quantity, setQuantity] = useState(1);
 
   const increase = () => {
-    setQuantity(quantity + 1);
+    if (quantity < stock) {
+      setQuantity(quantity + 1);
+    }
   };
 
   const decrease = () => {
@@ -15,19 +21,19 @@ export function QuantitySelector() {
   };
 
   return (
-    <div className="d-flex align-items-center gap-2">
+    <div className="align-items-center quantity-selector">
 
       <button
-        className="btn btn-outline-secondary"
+        className="quantity-btn"
         onClick={decrease}
       >
         -
       </button>
 
-      <span>{quantity}</span>
+      <span className="quantity-value">{quantity}</span>
 
       <button
-        className="btn btn-outline-secondary"
+        className="quantity-btn"
         onClick={increase}
       >
         +
