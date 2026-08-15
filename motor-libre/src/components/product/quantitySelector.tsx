@@ -1,22 +1,24 @@
-import { useState } from "react";
-
 interface QuantitySelectorProps {
   stock: number;
+  quantity: number;
+  onQuantityChange: (quantity: number) => void;
 }
 
-export function QuantitySelector({ stock }: QuantitySelectorProps) {
+export function QuantitySelector({
+  stock,
+  quantity,
+  onQuantityChange
+}: QuantitySelectorProps) {
 
-  const [quantity, setQuantity] = useState(1);
-
-  const increase = () => {
-    if (quantity < stock) {
-      setQuantity(quantity + 1);
+  const decreaseQuantity = () => {
+    if (quantity > 1) {
+      onQuantityChange(quantity - 1);
     }
   };
 
-  const decrease = () => {
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
+  const increaseQuantity = () => {
+    if (quantity < stock) {
+      onQuantityChange(quantity + 1);
     }
   };
 
@@ -25,7 +27,7 @@ export function QuantitySelector({ stock }: QuantitySelectorProps) {
 
       <button
         className="quantity-btn"
-        onClick={decrease}
+        onClick={decreaseQuantity}
       >
         -
       </button>
@@ -34,7 +36,7 @@ export function QuantitySelector({ stock }: QuantitySelectorProps) {
 
       <button
         className="quantity-btn"
-        onClick={increase}
+        onClick={increaseQuantity}
       >
         +
       </button>
