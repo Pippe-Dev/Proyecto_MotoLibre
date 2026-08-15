@@ -1,5 +1,5 @@
 import heroImg from './assets/motor-libre.png'
-import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Route, Routes} from 'react-router-dom';
 import './App.css'
 import { ProductPage } from './pages/productDetailPage';
 import { CartProvider } from './context/cartContext';
