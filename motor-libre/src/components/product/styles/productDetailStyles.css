@@ -3,8 +3,8 @@
 }
 
 .price-product {
-  font-size: 1.2rem;
-  color: red;
+  font-size: xx-large;
+  color: #e96602;
   margin-bottom: 1rem;
   text-align: left;
 }
@@ -13,7 +13,7 @@
   max-width: 100%;
   height: auto;
   margin-bottom: 1rem;
-  border: 1px solid #000000;
+  border: 0.5px inset #363636;
 }
 
 .out-of-stock {

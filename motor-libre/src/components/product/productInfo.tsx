@@ -51,13 +51,19 @@ export function ProductInfo({product,}: ProductInfoProps) {
         {product.name}
       </h1>
 
-      <h2 className="price-product">
+      <h1 className="price-product">
         ${product.price.toLocaleString("es-CO")}
-      </h2>
+      </h1>
 
       <p className="title-product">
         {product.description}
       </p>
+
+      <p style={{ fontWeight: "bold" , color: "green"}}>
+        Stock disponible: {product.stock} unidades
+      </p>
+
+      <p style={{ fontWeight: "bold" , color: "black"}}>Cantidad: </p>
 
       <div className="d-flex align-items-center gap-2 mt-4">
         <QuantitySelector
@@ -65,13 +71,14 @@ export function ProductInfo({product,}: ProductInfoProps) {
           quantity={quantity}
           onQuantityChange={setQuantity}
         />
+      </div>
 
-        <button className="btn btn-primary btn-add-cart"
+      <br />
+      <button className="btn btn-primary btn-add-cart bi bi-cart-fill mt-3"
         onClick={handleAddToCart}
         >
           AÑADIR AL CARRITO
         </button>
-      </div>
 
 
     </div>
