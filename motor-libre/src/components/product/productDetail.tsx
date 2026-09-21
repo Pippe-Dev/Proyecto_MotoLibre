@@ -51,6 +51,39 @@ export function ProductDetail() {
         </div>
 
       </div>
+
+      <div className="product-benefits">
+
+        <div className="product-benefit">
+          <i className="bi bi-clock benefit-icon"></i>
+
+          <div>
+            <strong>Pago en tienda</strong>
+            <span>Recoge en tienda</span>
+          </div>
+        </div>
+
+
+        <div className="product-benefit">
+          <i className="bi bi-patch-check benefit-icon"></i>
+
+          <div>
+            <strong>Garantía de calidad</strong>
+            <span>Productos certificados</span>
+          </div>
+        </div>
+
+
+        <div className="product-benefit">
+          <i className="bi bi-chat-left-text benefit-icon"></i>
+
+          <div>
+            <strong>¿Tienes dudas?</strong>
+            <span>Contáctanos</span>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }
