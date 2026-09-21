@@ -13,14 +13,23 @@ interface ProductInfoProps {
 
 export function ProductInfo({product,}: ProductInfoProps) {
 
-  const handleAddToCart = () => {
+  const [showSuccess, setShowSuccess] = useState(false);
 
+  const handleAddToCart = () => {
   const added = addToCart(product, quantity);
+
+  if (added) {
+    setShowSuccess(true);
+
+    setTimeout(() => {
+      setShowSuccess(false);
+    }, 2500);
+  }
 
   console.log("Producto:", product);
   console.log("Cantidad:", quantity);
   console.log("¿Se agregó?", added);
-  };
+};
 
   const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
@@ -74,12 +83,18 @@ export function ProductInfo({product,}: ProductInfoProps) {
       </div>
 
       <br />
-      <button className="btn btn-primary btn-add-cart bi bi-cart-fill mt-3"
+      <button
+        className="btn btn-primary btn-add-cart bi bi-cart-fill mt-3"
         onClick={handleAddToCart}
-        >
-          AÑADIR AL CARRITO
-        </button>
+      >
+        AÑADIR AL CARRITO
+      </button>
 
+      {showSuccess && (
+        <div className="cart-success-message">
+          ✅ Producto agregado al carrito
+        </div>
+      )}
 
     </div>
   );
