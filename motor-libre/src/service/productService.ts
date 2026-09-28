@@ -31,9 +31,10 @@ const mockProducts: Product[] = [
     price: 150000,
     description: "Parrilla trasera para instalación de accesorios y equipaje.",
     images: [
-      "/images/parrilla.jpg"
-    ],
-    stock: 0
+    "/images/honda/protector-honda-xr.jpg",
+    "/images/honda/slider-honda-xr.jpg"
+  ],
+    stock: 3
   },
 ];
 
