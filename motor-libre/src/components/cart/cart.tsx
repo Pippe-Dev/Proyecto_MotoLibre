@@ -1,51 +1,85 @@
 import { useCart } from "../../context/cartContext";
 import { CartItem } from "./cartItem";
 import { CartSummary } from "./cartSummary";
+import { Link } from "react-router-dom";
+import "./cart.css";
+
+const SHOP_PATH = "/carrito";
 
 export function Cart() {
-
   const { cartItems } = useCart();
 
   if (cartItems.length === 0) {
     return (
-      <div className="container mt-4">
-        <h1>Carrito</h1>
+      <main className="cart-page">
+        <div className="cart-container">
+          <h1 className="cart-title">TU CARRITO</h1>
 
-        <p>
-          Tu carrito está vacío.
-        </p>
-      </div>
+          <section
+            className="cart-empty"
+            aria-labelledby="empty-cart-title"
+          >
+            <div className="cart-empty__icon" aria-hidden="true">
+              🛒
+            </div>
+
+            <h2 id="empty-cart-title">
+              Tu carrito está vacío
+            </h2>
+
+            <p>
+              Aún no has agregado productos a tu carrito.
+            </p>
+            <Link to={SHOP_PATH} className="cart-continue">
+              IR A LA TIENDA
+            </Link>
+          </section>
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="container mt-4">
+    <main className="cart-page">
+      <div className="cart-container">
+        <h1 className="cart-title">TU CARRITO</h1>
 
-      <h1>Carrito</h1>
+        <div className="cart-layout">
+          <section
+            className="cart-products"
+            aria-label="Productos del carrito"
+          >
+            <div
+              className="cart-products__header"
+              aria-hidden="true"
+            >
+              <span>PRODUCTO</span>
+              <span>PRECIO</span>
+              <span>CANTIDAD</span>
+              <span>SUBTOTAL</span>
+              <span />
+            </div>
 
-      <div className="row">
+            <div className="cart-products__list">
+              {cartItems.map((item) => (
+                <CartItem
+                  key={item.product.id}
+                  item={item}
+                />
+              ))}
+            </div>
 
-        <div className="col-md-8">
+            <Link to={SHOP_PATH} className="cart-continue">
+              <span aria-hidden="true">←</span>
+              SEGUIR COMPRANDO
+            </Link>
+          </section>
 
-          {cartItems.map(item => (
-            <CartItem
-              key={item.product.id}
-              item={item}
-            />
-          ))}
-
+          <aside className="cart-summary-container">
+            <CartSummary cartItems={cartItems} />
+          </aside>
         </div>
-
-        <div className="col-md-4">
-
-          <CartSummary
-            cartItems={cartItems}
-          />
-
-        </div>
-
       </div>
-
-    </div>
+    </main>
   );
 }
