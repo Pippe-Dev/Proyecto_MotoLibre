@@ -4,7 +4,7 @@ import { CartSummary } from "./cartSummary";
 import { Link } from "react-router-dom";
 import "./cart.css";
 
-const SHOP_PATH = "/carrito";
+const SHOP_PATH = "/catalogo";
 
 export function Cart() {
   const { cartItems } = useCart();

@@ -1,7 +1,8 @@
 import {
   createContext,
   useContext,
-  useState
+  useState,
+  useEffect,
 } from "react";
 
 import type {
@@ -12,20 +13,59 @@ import type { Product } from "../types/detailedProduct";
 import type { CartItem } from "../types/cart";
 
 
-
 const CartContext = createContext<
   CartContextType | undefined
 >(undefined);
 
 
+const CART_STORAGE_KEY = "motor-libre-cart";
+
+
+function getInitialCart(): CartItem[] {
+  try {
+    const storedCart = localStorage.getItem(
+      CART_STORAGE_KEY
+    );
+
+    if (!storedCart) {
+      return [];
+    }
+
+    const parsedCart: unknown = JSON.parse(storedCart);
+
+    if (!Array.isArray(parsedCart)) {
+      return [];
+    }
+
+    return parsedCart as CartItem[];
+  } catch {
+    return [];
+  }
+}
+
+
 export function CartProvider({
   children
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
 
   const [cartItems, setCartItems] =
-    useState<CartItem[]>([]);
+    useState<CartItem[]>(getInitialCart);
+
+
+  /*
+   * Guarda automáticamente cualquier cambio
+   * realizado en el carrito.
+   */
+  useEffect(() => {
+
+    localStorage.setItem(
+      CART_STORAGE_KEY,
+      JSON.stringify(cartItems)
+    );
+
+  }, [cartItems]);
 
 
   const addToCart = (
@@ -33,9 +73,23 @@ export function CartProvider({
     quantity: number
   ): boolean => {
 
+    /*
+     * Validamos primero valores que no dependen
+     * del estado actual del carrito.
+     */
+    if (
+      quantity < 1 ||
+      product.stock < 1 ||
+      quantity > product.stock
+    ) {
+      return false;
+    }
+
+
     const existingItem = cartItems.find(
       item => item.product.id === product.id
     );
+
 
     const newQuantity = existingItem
       ? existingItem.quantity + quantity
@@ -49,14 +103,31 @@ export function CartProvider({
 
     setCartItems(currentItems => {
 
-      if (existingItem) {
+      const currentItem = currentItems.find(
+        item => item.product.id === product.id
+      );
+
+
+      if (currentItem) {
+
+        const updatedQuantity =
+          currentItem.quantity + quantity;
+
+
+        /*
+         * Segunda validación con el estado más
+         * reciente de React.
+         */
+        if (updatedQuantity > product.stock) {
+          return currentItems;
+        }
+
 
         return currentItems.map(item =>
           item.product.id === product.id
             ? {
                 ...item,
-                quantity:
-                  item.quantity + quantity
+                quantity: updatedQuantity
               }
             : item
         );
@@ -117,16 +188,36 @@ export function CartProvider({
     }
 
 
-    setCartItems(currentItems =>
-      currentItems.map(item =>
+    setCartItems(currentItems => {
+
+      const currentItem = currentItems.find(
+        item => item.product.id === productId
+      );
+
+
+      if (!currentItem) {
+        return currentItems;
+      }
+
+
+      if (
+        quantity < 1 ||
+        quantity > currentItem.product.stock
+      ) {
+        return currentItems;
+      }
+
+
+      return currentItems.map(item =>
         item.product.id === productId
           ? {
               ...item,
               quantity
             }
           : item
-      )
-    );
+      );
+
+    });
 
 
     return true;
