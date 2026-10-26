@@ -20,8 +20,7 @@ const mockProducts: Product[] = [
     price: 180000,
     description: "Defensa lateral de alta resistencia para motocicleta.",
     images: [
-      "/images/honda/defensa-lateral-1.jpg",
-      "/images/honda/defensa-lateral-2.jpg"
+      "/images/honda/Pechera.webp"
     ],
     stock: 0
   },
@@ -36,7 +35,74 @@ const mockProducts: Product[] = [
   ],
     stock: 3
   },
+  {
+    id: 18,
+    name: "Slider de motor",
+    price: 95000,
+    description: "Sliders de protección para motor y chasis, con tope de nylon de alta densidad. Ayudan a evitar daños en caídas a baja velocidad.",
+    images: [
+      "/images/honda/slider-honda-xr.jpg",
+      "/images/honda/protector-honda-xr.jpg"
+    ],
+    stock: 8
+  },
+  {
+    id: 19,
+    name: "Pechera reforzada",
+    price: 210000,
+    description: "Pechera reforzada en acero con acabado en pintura electrostática negra. Instalación sin modificaciones.",
+    images: [
+      "/images/honda/Pechera.webp"
+    ],
+    stock: 5
+  },
+  {
+    id: 20,
+    name: "Protector de tanque",
+    price: 75000,
+    description: "Protector para tanque de combustible que previene rayones y golpes durante la conducción off-road.",
+    images: [
+      "/images/honda/protector-honda-xr.jpg"
+    ],
+    stock: 15
+  },
+  {
+    id: 21,
+    name: "Guardabarros delantero",
+    price: 120000,
+    description: "Guardabarros delantero resistente a impactos, con ajuste preciso para suspensiones de horquilla convencional.",
+    images: [
+      "/images/honda/Pechera.webp",
+      "/images/honda/slider-honda-xr.jpg"
+    ],
+    stock: 0
+  },
+  {
+    id: 22,
+    name: "Manubrio de aluminio",
+    price: 165000,
+    description: "Manubrio de aluminio ligero y resistente, con diseño ergonómico para mayor control y comodidad.",
+    images: [
+      "/images/honda/slider-honda-xr.jpg"
+    ],
+    stock: 6
+  },
+  {
+    id: 23,
+    name: "Cubre cadena",
+    price: 68000,
+    description: "Protector de cadena de transmisión que reduce el desgaste y evita que la suciedad llegue al sistema.",
+    images: [
+      "/images/honda/protector-honda-xr.jpg",
+      "/images/honda/Pechera.webp"
+    ],
+    stock: 10
+  },
 ];
+
+export async function getProducts(): Promise<Product[]> {
+  return mockProducts;
+}
 
 export async function getProductById(
   id: number
