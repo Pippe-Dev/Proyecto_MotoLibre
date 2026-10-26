@@ -63,6 +63,8 @@ export function ProductImage({
         {product.images.length > 1 && (
           <>
             <button
+              type="button"
+              aria-label="Imagen anterior"
               className="gallery-arrow left"
               onClick={previousImage}
             >
@@ -70,6 +72,8 @@ export function ProductImage({
             </button>
 
             <button
+              type="button"
+              aria-label="Imagen siguiente"
               className="gallery-arrow right"
               onClick={nextImage}
             >
