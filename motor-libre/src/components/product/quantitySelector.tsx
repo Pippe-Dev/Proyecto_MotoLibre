@@ -26,6 +26,8 @@ export function QuantitySelector({
     <div className="align-items-center quantity-selector">
 
       <button
+        type="button"
+        aria-label="Disminuir cantidad"
         className="quantity-btn"
         onClick={decreaseQuantity}
       >
@@ -35,6 +37,8 @@ export function QuantitySelector({
       <span className="quantity-value">{quantity}</span>
 
       <button
+        type="button"
+        aria-label="Aumentar cantidad"
         className="quantity-btn"
         onClick={increaseQuantity}
       >

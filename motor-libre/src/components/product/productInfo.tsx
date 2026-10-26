@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Product } from "../../types/detailedProduct";
 
@@ -11,40 +11,42 @@ interface ProductInfoProps {
   product: Product;
 }
 
-export function ProductInfo({product,}: ProductInfoProps) {
+export function ProductInfo({ product }: ProductInfoProps) {
 
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  const handleAddToCart = () => {
-  const added = addToCart(product, quantity);
-
-  if (added) {
-    setShowSuccess(true);
-
-    setTimeout(() => {
-      setShowSuccess(false);
-    }, 2500);
-  }
-
-  console.log("Producto:", product);
-  console.log("Cantidad:", quantity);
-  console.log("¿Se agregó?", added);
-};
-
-  const [quantity, setQuantity] = useState(1);
   const { addToCart } = useCart();
 
-    if (product.stock === 0) {
+  const [quantity, setQuantity] = useState(1);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const timeoutRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    return () => window.clearTimeout(timeoutRef.current);
+  }, []);
+
+  const handleAddToCart = () => {
+    const added = addToCart(product, quantity);
+
+    if (added) {
+      setShowSuccess(true);
+
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = window.setTimeout(() => {
+        setShowSuccess(false);
+      }, 2500);
+    }
+  };
+
+  if (product.stock === 0) {
     return (
       <div>
         <h1 className="title-product">
-        {product.name}
-      </h1>
-
+          {product.name}
+        </h1>
 
         <p className="title-product">
-        {product.description}
-      </p>
+          {product.description}
+        </p>
 
         <p className="out-of-stock">
           Producto agotado
@@ -60,19 +62,19 @@ export function ProductInfo({product,}: ProductInfoProps) {
         {product.name}
       </h1>
 
-      <h1 className="price-product">
+      <p className="price-product">
         ${product.price.toLocaleString("es-CO")}
-      </h1>
+      </p>
 
       <p className="title-product">
         {product.description}
       </p>
 
-      <p style={{ fontWeight: "bold" , color: "green"}}>
+      <p className="stock-available">
         Stock disponible: {product.stock} unidades
       </p>
 
-      <p style={{ fontWeight: "bold" , color: "black"}}>Cantidad: </p>
+      <p className="quantity-label">Cantidad: </p>
 
       <div className="d-flex align-items-center gap-2 mt-4">
         <QuantitySelector
@@ -84,6 +86,7 @@ export function ProductInfo({product,}: ProductInfoProps) {
 
       <br />
       <button
+        type="button"
         className="btn btn-primary btn-add-cart bi bi-cart-fill mt-3"
         onClick={handleAddToCart}
       >
@@ -91,7 +94,7 @@ export function ProductInfo({product,}: ProductInfoProps) {
       </button>
 
       {showSuccess && (
-        <div className="cart-success-message">
+        <div className="cart-success-message" role="status">
           ✅ Producto agregado al carrito
         </div>
       )}

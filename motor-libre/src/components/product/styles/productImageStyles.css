@@ -43,13 +43,13 @@
 }
 
 .thumbnail:hover {
-  border-color: #7b2cbf;
+  border-color: var(--color-primary);
   transform: scale(1.03);
 }
 
 .thumbnail.active {
-  border-color: #5e35b1;
-  box-shadow: 0 0 0 2px rgba(94, 53, 177, 0.20);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(94, 36, 195, 0.20);
 }
 
 .thumbnail img {
@@ -104,5 +104,30 @@
   .thumbnail {
     width: 80px;
     height: 80px;
+  }
+}
+
+/* Zoom */
+.image-zoom {
+  position: absolute;
+
+  width: 150px;
+  height: 150px;
+
+  border: 2px solid var(--color-primary);
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+
+  background-repeat: no-repeat;
+  background-size: 300%;
+
+  pointer-events: none;
+
+  transform: translate(-50%, -50%);
+}
+
+@media (hover: none) {
+  .image-zoom {
+    display: none;
   }
 }

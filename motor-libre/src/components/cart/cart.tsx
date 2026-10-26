@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useCart } from "../../context/cartContext";
+import { createOrder } from "../../service/orderService";
 import { CartItem } from "./cartItem";
 import { CartSummary } from "./cartSummary";
 import { Link } from "react-router-dom";
@@ -7,13 +9,33 @@ import "./cart.css";
 const SHOP_PATH = "/catalogo";
 
 export function Cart() {
-  const { cartItems } = useCart();
+  const { cartItems, clearCart } = useCart();
+  const [confirmed, setConfirmed] = useState(false);
+  const [checkoutError, setCheckoutError] = useState(false);
+
+  const handleCheckout = async (): Promise<void> => {
+    setCheckoutError(false);
+
+    try {
+      await createOrder(cartItems);
+      clearCart();
+      setConfirmed(true);
+    } catch {
+      setCheckoutError(true);
+    }
+  };
 
   if (cartItems.length === 0) {
     return (
       <main className="cart-page">
         <div className="cart-container">
           <h1 className="cart-title">TU CARRITO</h1>
+
+          {confirmed && (
+            <p role="status">
+              Pedido registrado. Pasa a recogerlo y pagarlo en tienda.
+            </p>
+          )}
 
           <section
             className="cart-empty"
@@ -76,7 +98,11 @@ export function Cart() {
           </section>
 
           <aside className="cart-summary-container">
-            <CartSummary cartItems={cartItems} />
+            <CartSummary
+              cartItems={cartItems}
+              onCheckout={handleCheckout}
+              hasError={checkoutError}
+            />
           </aside>
         </div>
       </div>

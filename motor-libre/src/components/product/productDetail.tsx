@@ -1,7 +1,7 @@
 import type { Product } from "../../types/detailedProduct";
 
 import { useEffect, useState } from "react";
-import {useParams} from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { getProductById } from "../../service/productService";
 
@@ -12,40 +12,83 @@ export function ProductDetail() {
 
   const { id } = useParams();
 
-   const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
 
-   useEffect(() => {
+  useEffect(() => {
 
     if (!id) {
       return;
     }
 
+    let cancelled = false;
+
     getProductById(Number(id))
       .then((data) => {
-        setProduct(data);
+        if (!cancelled) {
+          setProduct(data);
+        }
       })
-      .catch((error) => {
-        console.error(error);
+      .catch(() => {
+        if (!cancelled) {
+          setFailedId(id);
+        }
       });
+
+    return () => {
+      cancelled = true;
+    };
 
   }, [id]);
 
-  if (!product) {
-    return <p>Cargando producto...</p>;
+  if (!id || failedId === id) {
+    return (
+      <div className="container state-message">
+        <p>Producto no encontrado.</p>
+        <Link className="btn btn-primary" to="/catalogo">
+          Volver a la tienda
+        </Link>
+      </div>
+    );
+  }
+
+  if (!product || String(product.id) !== id) {
+    return (
+      <div className="container py-4" aria-busy="true">
+        <div className="row">
+          <div className="col-md-6">
+            <div className="skeleton skeleton--image mx-auto" />
+          </div>
+          <div className="col-md-6">
+            <div className="skeleton skeleton--line" />
+            <div className="skeleton skeleton--line w-50" />
+            <div className="skeleton skeleton--line" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="container">
+      <nav className="breadcrumb-nav" aria-label="Ruta de navegación">
+        <Link to="/catalogo">Tienda</Link>
+        <span aria-hidden="true">/</span>
+        {product.name}
+      </nav>
+
       <div className="row">
 
         <div className="col-md-6">
-          <ProductImage 
-          product={product}
+          <ProductImage
+            key={product.id}
+            product={product}
           />
         </div>
 
         <div className="col-md-6">
-          <ProductInfo 
+          <ProductInfo
+            key={product.id}
             product={product}
           />
         </div>
