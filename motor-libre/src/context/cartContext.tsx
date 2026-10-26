@@ -3,14 +3,13 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
 } from "react";
 
-import type {
-  CartContextType
-} from "../types/cartContextType";
-
+import type { CartContextType } from "../types/cartContextType";
 import type { Product } from "../types/detailedProduct";
-import type { CartItem } from "../types/cart";
+import type { CartItem, StoredCartItem } from "../types/cart";
+import { getProductById } from "../service/productService";
 
 
 const CartContext = createContext<
@@ -21,11 +20,34 @@ const CartContext = createContext<
 const CART_STORAGE_KEY = "motor-libre-cart";
 
 
-function getInitialCart(): CartItem[] {
+function toStoredItem(raw: unknown): StoredCartItem | null {
+  if (typeof raw !== "object" || raw === null) {
+    return null;
+  }
+
+  const entry = raw as Record<string, unknown>;
+
+  /*
+   * Formato anterior: { product, quantity }.
+   */
+  const legacyId = (entry.product as { id?: unknown } | undefined)?.id;
+  const productId = entry.productId ?? legacyId;
+
+  if (
+    typeof productId !== "number" ||
+    typeof entry.quantity !== "number" ||
+    entry.quantity < 1
+  ) {
+    return null;
+  }
+
+  return { productId, quantity: entry.quantity };
+}
+
+
+function getInitialCart(): StoredCartItem[] {
   try {
-    const storedCart = localStorage.getItem(
-      CART_STORAGE_KEY
-    );
+    const storedCart = localStorage.getItem(CART_STORAGE_KEY);
 
     if (!storedCart) {
       return [];
@@ -37,7 +59,9 @@ function getInitialCart(): CartItem[] {
       return [];
     }
 
-    return parsedCart as CartItem[];
+    return parsedCart
+      .map(toStoredItem)
+      .filter((item): item is StoredCartItem => item !== null);
   } catch {
     return [];
   }
@@ -50,22 +74,70 @@ export function CartProvider({
   children: React.ReactNode;
 }) {
 
-  const [cartItems, setCartItems] =
-    useState<CartItem[]>(getInitialCart);
+  /*
+   * En localStorage solo se guardan id y cantidad; el precio
+   * y el stock siempre se consultan al servicio.
+   */
+  const [lines, setLines] =
+    useState<StoredCartItem[]>(getInitialCart);
+
+  const [products, setProducts] =
+    useState<Record<number, Product>>({});
+
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        CART_STORAGE_KEY,
+        JSON.stringify(lines)
+      );
+    } catch {
+      // Almacenamiento no disponible: el carrito sigue en memoria.
+    }
+  }, [lines]);
 
 
   /*
-   * Guarda automáticamente cualquier cambio
-   * realizado en el carrito.
+   * Al iniciar, se resuelven los productos guardados. Si alguno
+   * ya no existe se retira del carrito.
    */
   useEffect(() => {
+    let cancelled = false;
 
-    localStorage.setItem(
-      CART_STORAGE_KEY,
-      JSON.stringify(cartItems)
-    );
+    getInitialCart().forEach(({ productId }) => {
+      getProductById(productId)
+        .then(product => {
+          if (!cancelled) {
+            setProducts(current => ({
+              ...current,
+              [productId]: product
+            }));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setLines(current =>
+              current.filter(line => line.productId !== productId)
+            );
+          }
+        });
+    });
 
-  }, [cartItems]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+
+  const cartItems = useMemo<CartItem[]>(
+    () =>
+      lines.flatMap(({ productId, quantity }) =>
+        products[productId]
+          ? [{ product: products[productId], quantity }]
+          : []
+      ),
+    [lines, products]
+  );
 
 
   const addToCart = (
@@ -73,93 +145,40 @@ export function CartProvider({
     quantity: number
   ): boolean => {
 
-    /*
-     * Validamos primero valores que no dependen
-     * del estado actual del carrito.
-     */
+    const existing = lines.find(
+      line => line.productId === product.id
+    );
+
+    const newQuantity = (existing?.quantity ?? 0) + quantity;
+
     if (
       quantity < 1 ||
       product.stock < 1 ||
-      quantity > product.stock
+      newQuantity > product.stock
     ) {
       return false;
     }
 
+    setProducts(current => ({ ...current, [product.id]: product }));
 
-    const existingItem = cartItems.find(
-      item => item.product.id === product.id
+    setLines(current =>
+      existing
+        ? current.map(line =>
+            line.productId === product.id
+              ? { ...line, quantity: newQuantity }
+              : line
+          )
+        : [...current, { productId: product.id, quantity }]
     );
-
-
-    const newQuantity = existingItem
-      ? existingItem.quantity + quantity
-      : quantity;
-
-
-    if (newQuantity > product.stock) {
-      return false;
-    }
-
-
-    setCartItems(currentItems => {
-
-      const currentItem = currentItems.find(
-        item => item.product.id === product.id
-      );
-
-
-      if (currentItem) {
-
-        const updatedQuantity =
-          currentItem.quantity + quantity;
-
-
-        /*
-         * Segunda validación con el estado más
-         * reciente de React.
-         */
-        if (updatedQuantity > product.stock) {
-          return currentItems;
-        }
-
-
-        return currentItems.map(item =>
-          item.product.id === product.id
-            ? {
-                ...item,
-                quantity: updatedQuantity
-              }
-            : item
-        );
-
-      }
-
-
-      return [
-        ...currentItems,
-        {
-          product,
-          quantity
-        }
-      ];
-
-    });
-
 
     return true;
   };
 
 
-  const removeFromCart = (
-    productId: number
-  ): void => {
-
-    setCartItems(currentItems =>
-      currentItems.filter(
-        item => item.product.id !== productId
-      )
+  const removeFromCart = (productId: number): void => {
+    setLines(current =>
+      current.filter(line => line.productId !== productId)
     );
-
   };
 
 
@@ -168,71 +187,35 @@ export function CartProvider({
     quantity: number
   ): boolean => {
 
-    const item = cartItems.find(
-      item => item.product.id === productId
+    const product = products[productId];
+
+    if (
+      !product ||
+      !lines.some(line => line.productId === productId) ||
+      quantity < 1 ||
+      quantity > product.stock
+    ) {
+      return false;
+    }
+
+    setLines(current =>
+      current.map(line =>
+        line.productId === productId
+          ? { ...line, quantity }
+          : line
+      )
     );
-
-
-    if (!item) {
-      return false;
-    }
-
-
-    if (quantity < 1) {
-      return false;
-    }
-
-
-    if (quantity > item.product.stock) {
-      return false;
-    }
-
-
-    setCartItems(currentItems => {
-
-      const currentItem = currentItems.find(
-        item => item.product.id === productId
-      );
-
-
-      if (!currentItem) {
-        return currentItems;
-      }
-
-
-      if (
-        quantity < 1 ||
-        quantity > currentItem.product.stock
-      ) {
-        return currentItems;
-      }
-
-
-      return currentItems.map(item =>
-        item.product.id === productId
-          ? {
-              ...item,
-              quantity
-            }
-          : item
-      );
-
-    });
-
 
     return true;
   };
 
 
   const clearCart = (): void => {
-
-    setCartItems([]);
-
+    setLines([]);
   };
 
 
   return (
-
     <CartContext.Provider
       value={{
         cartItems,
@@ -242,28 +225,22 @@ export function CartProvider({
         clearCart
       }}
     >
-
       {children}
-
     </CartContext.Provider>
-
   );
 }
 
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCart() {
 
   const context = useContext(CartContext);
 
-
   if (!context) {
-
     throw new Error(
       "useCart debe utilizarse dentro de CartProvider"
     );
-
   }
-
 
   return context;
 }
