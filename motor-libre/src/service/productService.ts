@@ -1,131 +1,69 @@
+
 import type { Product } from "../types/detailedProduct";
 
-//const API_URL = "http://localhost:3000/api";
+const API_URL = "http://localhost:3000/api";
 
-const mockProducts: Product[] = [
-{
-  id: 15,
-  name: "Protector de motor",
-  price: 250000,
-  description: "Protector de motor tipo pechera, fabricado en acero de alta resistencia. Diseñado para motocicletas Honda XR150.",
-  images: [
-    "/images/honda/protector-honda-xr.jpg",
-    "/images/honda/slider-honda-xr.jpg"
-  ],
-  stock: 12
-},
-  {
-    id: 16,
-    name: "Defensa lateral",
-    price: 180000,
-    description: "Defensa lateral de alta resistencia para motocicleta.",
-    images: [
-      "/images/honda/Pechera.webp"
-    ],
-    stock: 0
-  },
-  {
-    id: 17,
-    name: "Parrilla trasera",
-    price: 150000,
-    description: "Parrilla trasera para instalación de accesorios y equipaje.",
-    images: [
-    "/images/honda/protector-honda-xr.jpg",
-    "/images/honda/slider-honda-xr.jpg"
-  ],
-    stock: 3
-  },
-  {
-    id: 18,
-    name: "Slider de motor",
-    price: 95000,
-    description: "Sliders de protección para motor y chasis, con tope de nylon de alta densidad. Ayudan a evitar daños en caídas a baja velocidad.",
-    images: [
-      "/images/honda/slider-honda-xr.jpg",
-      "/images/honda/protector-honda-xr.jpg"
-    ],
-    stock: 8
-  },
-  {
-    id: 19,
-    name: "Pechera reforzada",
-    price: 210000,
-    description: "Pechera reforzada en acero con acabado en pintura electrostática negra. Instalación sin modificaciones.",
-    images: [
-      "/images/honda/Pechera.webp"
-    ],
-    stock: 5
-  },
-  {
-    id: 20,
-    name: "Protector de tanque",
-    price: 75000,
-    description: "Protector para tanque de combustible que previene rayones y golpes durante la conducción off-road.",
-    images: [
-      "/images/honda/protector-honda-xr.jpg"
-    ],
-    stock: 15
-  },
-  {
-    id: 21,
-    name: "Guardabarros delantero",
-    price: 120000,
-    description: "Guardabarros delantero resistente a impactos, con ajuste preciso para suspensiones de horquilla convencional.",
-    images: [
-      "/images/honda/Pechera.webp",
-      "/images/honda/slider-honda-xr.jpg"
-    ],
-    stock: 0
-  },
-  {
-    id: 22,
-    name: "Manubrio de aluminio",
-    price: 165000,
-    description: "Manubrio de aluminio ligero y resistente, con diseño ergonómico para mayor control y comodidad.",
-    images: [
-      "/images/honda/slider-honda-xr.jpg"
-    ],
-    stock: 6
-  },
-  {
-    id: 23,
-    name: "Cubre cadena",
-    price: 68000,
-    description: "Protector de cadena de transmisión que reduce el desgaste y evita que la suciedad llegue al sistema.",
-    images: [
-      "/images/honda/protector-honda-xr.jpg",
-      "/images/honda/Pechera.webp"
-    ],
-    stock: 10
-  },
-];
-
-export async function getProducts(): Promise<Product[]> {
-  return mockProducts;
+interface ApiProduct {
+  id_producto: number;
+  nombre: string;
+  descripcion: string;
+  imagen: string | null;
+  precio: number | string;
+  existencias: number | string;
+  marca?: string | null;
+  modelo?: string | null;
 }
 
-export async function getProductById(
-  id: number
-): Promise<Product> {
+function mapProduct(product: ApiProduct): Product {
+  return {
+    id: Number(product.id_producto),
+    name: product.nombre,
+    price: Number(product.precio),
+    description: product.descripcion,
+    images: product.imagen ? [product.imagen] : [],
+    stock: Number(product.existencias),
+    brand: product.marca ?? "",
+    model: product.modelo ?? "",
+  };
+}
 
-  /*const response = await fetch(
-    `${API_URL}/productos/${id}`
-  );
+export async function getProducts(
+  filters?: { brand?: string; model?: string }
+): Promise<Product[]> {
+  const params = new URLSearchParams();
 
-  if (!response.ok) {
-    throw new Error("No se pudo obtener el producto");
+  if (filters?.brand) {
+    params.set("marca", filters.brand);
   }
 
-  const product: Product = await response.json();
+  if (filters?.model) {
+    params.set("modelo", filters.model);
+  }
 
-  return product;*/
-  const product = mockProducts.find(
-    (product) => product.id === id
-  );
+  const query = params.toString();
+  const url = query
+    ? `${API_URL}/products?${query}`
+    : `${API_URL}/products`;
 
-  if (!product) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("No se pudieron obtener los productos");
+  }
+
+  const products: ApiProduct[] = await response.json();
+
+  return products.map(mapProduct);
+}
+
+export async function getProductById(id: number): Promise<Product> {
+  const response = await fetch(`${API_URL}/products/${id}`);
+
+  if (!response.ok) {
     throw new Error("Producto no encontrado");
   }
 
-  return product;
+  const product: ApiProduct = await response.json();
+
+  return mapProduct(product);
 }
