@@ -264,6 +264,67 @@
 /* CATALOGO                      */
 /* ============================= */
 
+
+.catalog-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+}
+
+.catalog-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 200px;
+}
+
+.catalog-filter label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.catalog-filter select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: #fff;
+  color: inherit;
+}
+
+.catalog-filter select:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.catalog-filter__clear {
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+  background-color: transparent;
+  color: var(--color-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.catalog-filter__clear:hover:not(:disabled) {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.catalog-filter__clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
