@@ -7,6 +7,7 @@ import { NotFoundPage } from './pages/notFoundPage';
 import { ProductPage } from './pages/productDetailPage';
 import { CartProvider, useCart } from './context/cartContext';
 import { CartPage } from './pages/cartPage';
+import { ReservationsLookupPage } from './pages/reservationsLookupPage';
 import { Footer } from './components/layout/footer';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -36,6 +37,7 @@ export function Navbar() {
           <ul className="navbar-nav me-auto">
             <li className="nav-item"><NavLink className={navLinkClass} to="/" end>Inicio</NavLink></li>
             <li className="nav-item"><NavLink className={navLinkClass} to="/catalogo">Tienda</NavLink></li>
+            <li className="nav-item"><NavLink className={navLinkClass} to="/reservas">Consultar reservas</NavLink></li>
             <li className="nav-item"><NavLink className={navLinkClass} to="/contacto">Contáctenos</NavLink></li>
           </ul>
           <ul className="navbar-nav">
@@ -71,6 +73,7 @@ function App() {
             <Route path="/contacto" element={<ContactPage />} />
             <Route path="/producto/:id" element={<ProductPage />} />
             <Route path="/carrito" element={<CartPage />} />
+            <Route path="/reservas" element={<ReservationsLookupPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
           <Footer />
