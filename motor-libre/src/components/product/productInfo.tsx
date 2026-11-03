@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Product } from "../../types/detailedProduct";
 
 import { QuantitySelector } from "./quantitySelector";
+import { ReservationModal } from "./reservationModal";
 import { useCart } from "../../context/cartContext";
 
 import "./styles/productDetailStyles.css";
@@ -17,6 +18,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
 
   const [quantity, setQuantity] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showReservation, setShowReservation] = useState(false);
 
   const timeoutRef = useRef<number | undefined>(undefined);
 
@@ -85,19 +87,35 @@ export function ProductInfo({ product }: ProductInfoProps) {
       </div>
 
       <br />
-      <button
-        type="button"
-        className="btn btn-primary btn-add-cart bi bi-cart-fill mt-3"
-        onClick={handleAddToCart}
-      >
-        AÑADIR AL CARRITO
-      </button>
+      <div className="d-flex gap-2 flex-wrap">
+        <button
+          type="button"
+          className="btn btn-primary btn-add-cart bi bi-cart-fill mt-3"
+          onClick={handleAddToCart}
+        >
+          AÑADIR AL CARRITO
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-outline-primary btn-add-cart bi bi-bookmark-check mt-3"
+          onClick={() => setShowReservation(true)}
+        >
+          RESERVAR
+        </button>
+      </div>
 
       {showSuccess && (
         <div className="cart-success-message" role="status">
           ✅ Producto agregado al carrito
         </div>
       )}
+
+      <ReservationModal
+        product={product}
+        show={showReservation}
+        onClose={() => setShowReservation(false)}
+      />
 
     </div>
   );

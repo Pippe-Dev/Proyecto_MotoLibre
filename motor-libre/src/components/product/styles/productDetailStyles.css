@@ -121,6 +121,20 @@ h1.title-product {
   animation: fadeIn 0.3s ease;
 }
 
+.reservation-error {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background-color: #fde8e8;
+  color: var(--color-danger);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.reservation-modal {
+  z-index: 1056;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
