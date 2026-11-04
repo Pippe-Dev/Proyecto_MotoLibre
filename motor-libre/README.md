@@ -1,75 +1,116 @@
-# React + TypeScript + Vite
+# MotoLibre · Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicación web de la tienda MotoLibre, hecha con **React 19 + TypeScript + Vite**. Muestra el catálogo, el detalle de producto, el carrito y la gestión de reservas. No guarda datos por sí sola: los pide a dos APIs.
 
-Currently, two official plugins are available:
+> Esta carpeta también contiene las dos APIs ([`ApiProducto`](ApiProducto/README.md) y [`api`](api/README.md)). Para ver cómo encaja todo, empieza por el [README principal](../README.md).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Requisitos
 
-## React Compiler
+- Node.js 18 o superior
+- Las dos APIs en marcha (si no, el catálogo y las reservas no cargan)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Instalación y ejecución
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```powershell
+npm install
+Copy-Item .env.example .env
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Se abre en **http://localhost:5173**.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Scripts disponibles
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Comando | Para qué sirve |
+|---|---|
+| `npm run dev` | Servidor de desarrollo con recarga automática |
+| `npm run build` | Revisa los tipos con TypeScript y genera la versión de producción en `dist/` |
+| `npm run preview` | Sirve localmente la versión generada por `build` |
+| `npm run lint` | Revisa el código con ESLint |
+
+## Variables de entorno
+
+Archivo `.env` (se crea copiando `.env.example`). Las variables de Vite deben empezar por `VITE_`.
+
+| Variable | Valor por defecto | Descripción |
+|---|---|---|
+| `VITE_RESERVATIONS_API_URL` | `http://localhost:3001/api` | Dirección de la API de reservas |
+
+> La dirección de la API de productos (`http://localhost:3000/api`) está escrita directamente en [`src/service/productService.ts`](src/service/productService.ts). Si algún día cambia, hay que modificarla ahí.
+
+Si cambias un `.env`, reinicia `npm run dev`.
+
+## Páginas
+
+Las rutas están definidas en [`src/App.tsx`](src/App.tsx).
+
+| Ruta | Archivo | Descripción |
+|---|---|---|
+| `/` | `pages/homePage.tsx` | Inicio con carrusel |
+| `/catalogo` | `pages/catalogPage.tsx` | Listado con filtros por marca y modelo |
+| `/producto/:id` | `pages/productDetailPage.tsx` | Detalle, galería con zoom, selector de cantidad, añadir al carrito y reservar |
+| `/carrito` | `pages/cartPage.tsx` | Carrito y reserva de todos los productos |
+| `/reservas` | `pages/reservationsLookupPage.tsx` | Consulta, edición y cancelación de reservas |
+| `/contacto` | `pages/contactPage.tsx` | Contacto |
+| `*` | `pages/notFoundPage.tsx` | Página 404 |
+
+## Estructura de `src/`
 
 ```
+src/
+├── components/
+│   ├── cart/            Carrito: lista, resumen y modal para reservar desde el carrito
+│   ├── home/            Carrusel de la portada
+│   ├── layout/          Pie de página
+│   ├── product/         Detalle: imagen con zoom, información, selector de cantidad, modal de reserva
+│   └── reservations/    "Mis reservas": buscador y tarjeta de cada reserva
+├── constants/           Estados de reserva y sus etiquetas
+├── context/             cartContext: estado global del carrito
+├── pages/               Una página por ruta
+├── service/             Llamadas HTTP a las APIs
+├── types/               Tipos de TypeScript
+├── App.tsx              Barra de navegación y rutas
+└── main.tsx             Punto de entrada
+```
+
+### Capa de servicios (`src/service/`)
+
+| Archivo | Responsabilidad |
+|---|---|
+| `productService.ts` | Lista productos (con filtros) y consulta uno por id. Convierte la respuesta de la API al formato que usa la interfaz |
+| `reservationService.ts` | Crea, consulta, edita y cancela reservas |
+| `orderService.ts` | Sin uso por ahora (código comentado) |
+
+Los componentes nunca llaman a `fetch` directamente: siempre pasan por estos archivos.
+
+## Piezas importantes
+
+### Carrito (`context/cartContext.tsx`)
+Es un contexto de React que comparte el carrito con toda la aplicación. Guarda en el navegador **solo el id y la cantidad** de cada producto, no el producto completo, así que al recargar vuelve a pedir los datos actualizados a la API.
+
+### Reservas (`components/reservations/`)
+- `reservationsLookup.tsx`: formulario de búsqueda por documento y estado, resumen y lista de resultados.
+- `reservationCard.tsx`: tarjeta de cada reserva. Si está activa, permite **editar** (cantidad, celular, correo) y **cancelar** con confirmación. Actualiza la tarjeta en pantalla sin repetir la búsqueda.
+- `reservationsLookup.css`: estilos del módulo.
+
+Para reservar hay dos modales con el mismo formulario: `product/reservationModal.tsx` (un producto) y `cart/cartReservationModal.tsx` (todo el carrito, una reserva por producto).
+
+### Imágenes
+Las imágenes de productos están en `public/images/`. Si una imagen no carga, los componentes muestran `public/images/sin-imagen.svg` mediante el evento `onError`. Cuando agregues fotos:
+
+1. Copia el archivo a `public/images/productos/` con un nombre en minúsculas y sin espacios.
+2. En Supabase, actualiza la columna `imagen` del producto con la ruta, por ejemplo `/images/productos/casco.jpg`.
+
+### Estilos
+- Bootstrap 5 para la base, y Bootstrap Icons para los íconos.
+- Los colores y medidas comunes están como variables CSS al inicio de `src/App.css` (`--color-primary`, `--radius`, `--shadow-sm`...). Úsalas en vez de escribir colores a mano.
+
+## Problemas frecuentes
+
+| Síntoma | Causa probable |
+|---|---|
+| Catálogo vacío o mensaje de error | La API de productos no está corriendo, o falta su clave anon |
+| Error al reservar o consultar reservas | La API de reservas no está corriendo, o falta su clave service_role |
+| Error de CORS en la consola del navegador | El frontend corre en un puerto distinto de 5173 y las APIs no lo permiten |
+| El cambio de `.env` no se aplica | Falta reiniciar `npm run dev` |
+| `npm run build` falla con errores de tipos | Revisa el archivo que indica TypeScript; el proyecto usa modo estricto |
