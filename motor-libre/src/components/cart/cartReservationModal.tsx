@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import type { CartItem } from "../../types/cart";
-import { createReservation } from "../../service/reservationService";
+import { createReservationsBatch } from "../../service/reservationService";
 
 interface CartReservationModalProps {
   cartItems: CartItem[];
@@ -81,23 +81,25 @@ export function CartReservationModal({
     setSubmitting(true);
 
     try {
-      for (const item of cartItems) {
-        await createReservation({
-          nombre: form.nombre.trim(),
-          documento: form.documento.trim(),
-          tipoDocumento: form.tipoDocumento,
-          correo: form.correo.trim(),
-          celular: form.celular.trim(),
+      await createReservationsBatch({
+        nombre: form.nombre.trim(),
+        documento: form.documento.trim(),
+        tipoDocumento: form.tipoDocumento,
+        correo: form.correo.trim(),
+        celular: form.celular.trim(),
+        items: cartItems.map((item) => ({
           idProducto: item.product.id,
           cantidad: item.quantity,
-        });
-      }
+        })),
+      });
 
       setSuccess(true);
       onSuccess();
-    } catch {
+    } catch (caught) {
       setError(
-        "No se pudo registrar la reserva de uno o más productos. Inténtalo de nuevo."
+        caught instanceof Error && caught.message
+          ? `${caught.message} No se creó ninguna reserva.`
+          : "No se pudieron registrar las reservas. No se creó ninguna reserva. Inténtalo de nuevo."
       );
     } finally {
       setSubmitting(false);

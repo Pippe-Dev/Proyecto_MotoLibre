@@ -2,9 +2,7 @@ import type { CartItem } from "../../types/cart";
 
 interface CartSummaryProps {
   cartItems: CartItem[];
-  onCheckout: () => void;
   onReserve: () => void;
-  hasError?: boolean;
 }
 
 const formatPrice = (price: number): string =>
@@ -16,9 +14,7 @@ const formatPrice = (price: number): string =>
 
 export function CartSummary({
   cartItems,
-  onCheckout,
   onReserve,
-  hasError = false,
 }: CartSummaryProps) {
   const subtotal = cartItems.reduce(
     (total, item) =>
@@ -71,21 +67,6 @@ export function CartSummary({
           Revisa las cantidades del carrito antes de continuar.
         </p>
       )}
-
-      {hasError && (
-        <p className="cart-summary__warning" role="alert">
-          No se pudo registrar el pedido. Inténtalo de nuevo.
-        </p>
-      )}
-
-      <button
-        type="button"
-        className="cart-summary__checkout"
-        onClick={onCheckout}
-        disabled={hasUnavailableProducts}
-      >
-        FINALIZAR PEDIDO
-      </button>
 
       <button
         type="button"

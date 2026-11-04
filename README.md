@@ -82,7 +82,18 @@ Después abre estos dos archivos y reemplaza el texto de ejemplo por las claves 
 
 Escríbelas sin comillas ni espacios y guarda el archivo. El `.env` del frontend no necesita cambios.
 
-### 4. Arrancar las tres aplicaciones
+### 4. Aplicar la migración de la base de datos (una sola vez)
+
+El control de existencias y la caducidad de reservas dependen de un *trigger* en Supabase. Está en [`motor-libre/api/supabase/migrations/`](motor-libre/api/supabase/migrations/20261104000000_stock_y_caducidad_reservas.sql).
+
+1. Abre Supabase → **SQL Editor** → *New query*.
+2. Pega el contenido completo del archivo `.sql` y pulsa **Run**.
+
+Es seguro ejecutarlo más de una vez. Hay que hacerlo **una vez por base de datos**: si ya lo ejecutó otra persona sobre el mismo proyecto de Supabase, no tienes que repetirlo.
+
+> Si no se ejecuta, la API sigue funcionando pero el stock no se descuenta y la caducidad de reservas falla (verás el error en la consola de la API).
+
+### 5. Arrancar las tres aplicaciones
 
 Abre **tres terminales**, todas dentro de `motor-libre`, y ejecuta una orden en cada una:
 
@@ -101,7 +112,7 @@ npm run dev
 
 Abre **http://localhost:5173** en el navegador.
 
-### 5. Comprobar que todo responde
+### 6. Comprobar que todo responde
 
 | Dirección | Respuesta esperada |
 |---|---|
@@ -120,16 +131,17 @@ Abre **http://localhost:5173** en el navegador.
 | `/producto/:id` | Detalle de un producto, con opción de añadir al carrito o reservar |
 | `/carrito` | Carrito de compras, con opción de reservar todos los productos |
 | `/reservas` | **Mis reservas**: consulta por documento, edición y cancelación |
-| `/contacto` | Información de contacto |
+| `/contacto` | Datos de contacto, horario y pasos para reservar |
 
 ---
 
 ## Cómo funciona una reserva
 
 1. El cliente elige un producto (o varios desde el carrito) y llena el formulario con nombre, tipo y número de documento, correo, celular y cantidad.
-2. La API de reservas comprueba que el producto exista y que haya existencias suficientes.
-3. Se guarda la reserva con estado **activo** (se muestra como "Pagado").
-4. Más tarde, en `/reservas`, el cliente escribe su documento y ve sus reservas. Mientras estén activas, puede **editarlas** (cantidad, correo, celular) o **cancelarlas**.
+2. La API de reservas comprueba que el producto exista y que haya existencias suficientes. Si el carrito tiene varios productos, la reserva es **"todo o nada"**: si uno falla (por ejemplo, se agotó), no se crea ninguna y el cliente ve el motivo.
+3. Se guarda la reserva con estado **activo** (se muestra como "Pagado") y **se descuentan las unidades** del stock del producto.
+4. Más tarde, en `/reservas`, el cliente escribe su documento y ve sus reservas. Mientras estén activas, puede **editarlas** (cantidad, correo, celular) o **cancelarlas**. Al cancelar o reducir la cantidad, las unidades **vuelven al stock**.
+5. Si una reserva activa supera `RESERVATION_TTL_HOURS` (48 h en el ejemplo) sin completarse, la API la **caduca** sola y devuelve las unidades al stock.
 
 Estados de una reserva:
 
@@ -165,6 +177,7 @@ Las APIs esperan estas dos tablas.
 | `id_producto` | Llave foránea hacia `productos.id_producto` |
 | `cantidad` | Unidades reservadas |
 | `estado` | `activo`, `exitoso` o `eliminado` |
+| `creado_en` | Fecha de creación (la añade la migración); se usa para caducar reservas |
 
 La llave foránea de `reservas.id_producto` es obligatoria: la consulta de reservas la usa para traer el nombre, el precio y la imagen del producto.
 
@@ -218,8 +231,9 @@ npm run build   # comprueba los tipos y genera la versión de producción
 
 ## Limitaciones conocidas
 
-- Al reservar, **no se descuentan las existencias** del producto. Solo se valida que haya suficientes en ese momento.
-- Las reservas **no caducan** automáticamente. La variable `RESERVATION_TTL_HOURS` existe en el ejemplo, pero todavía no se usa.
+- **La caducidad solo corre mientras la API de reservas está encendida.** Si estuvo apagada, caducará las reservas vencidas en cuanto vuelva a arrancar (y luego cada 15 minutos).
+- Las reservas que ya existían **antes de aplicar la migración** no descontaron stock. Hay un bloque opcional al final del archivo `.sql` para corregirlo una sola vez.
+- Marcar una reserva como **Entregada** (`exitoso`) se hace a mano en Supabase; la API no tiene esa ruta.
 - **No hay inicio de sesión.** Quien conozca un número de documento puede ver y cancelar sus reservas. Es suficiente para una demostración, pero no para producción.
 - No se envían correos de confirmación.
 

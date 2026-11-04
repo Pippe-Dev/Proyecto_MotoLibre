@@ -34,9 +34,10 @@ Archivo `.env` (se crea copiando `.env.example`). Las variables de Vite deben em
 
 | Variable | Valor por defecto | Descripción |
 |---|---|---|
+| `VITE_PRODUCTS_API_URL` | `http://localhost:3000/api` | Dirección de la API de productos |
 | `VITE_RESERVATIONS_API_URL` | `http://localhost:3001/api` | Dirección de la API de reservas |
 
-> La dirección de la API de productos (`http://localhost:3000/api`) está escrita directamente en [`src/service/productService.ts`](src/service/productService.ts). Si algún día cambia, hay que modificarla ahí.
+Si no defines una variable, se usa el valor por defecto de la tabla, que corresponde a ejecutar todo en tu equipo. Para desplegar, apunta estas dos variables a las direcciones públicas de las APIs.
 
 Si cambias un `.env`, reinicia `npm run dev`.
 
@@ -51,7 +52,7 @@ Las rutas están definidas en [`src/App.tsx`](src/App.tsx).
 | `/producto/:id` | `pages/productDetailPage.tsx` | Detalle, galería con zoom, selector de cantidad, añadir al carrito y reservar |
 | `/carrito` | `pages/cartPage.tsx` | Carrito y reserva de todos los productos |
 | `/reservas` | `pages/reservationsLookupPage.tsx` | Consulta, edición y cancelación de reservas |
-| `/contacto` | `pages/contactPage.tsx` | Contacto |
+| `/contacto` | `pages/contactPage.tsx` | Datos de contacto, horario y pasos para reservar |
 | `*` | `pages/notFoundPage.tsx` | Página 404 |
 
 ## Estructura de `src/`
@@ -78,8 +79,7 @@ src/
 | Archivo | Responsabilidad |
 |---|---|
 | `productService.ts` | Lista productos (con filtros) y consulta uno por id. Convierte la respuesta de la API al formato que usa la interfaz |
-| `reservationService.ts` | Crea, consulta, edita y cancela reservas |
-| `orderService.ts` | Sin uso por ahora (código comentado) |
+| `reservationService.ts` | Crea (una o varias a la vez), consulta, edita y cancela reservas |
 
 Los componentes nunca llaman a `fetch` directamente: siempre pasan por estos archivos.
 
@@ -93,7 +93,10 @@ Es un contexto de React que comparte el carrito con toda la aplicación. Guarda 
 - `reservationCard.tsx`: tarjeta de cada reserva. Si está activa, permite **editar** (cantidad, celular, correo) y **cancelar** con confirmación. Actualiza la tarjeta en pantalla sin repetir la búsqueda.
 - `reservationsLookup.css`: estilos del módulo.
 
-Para reservar hay dos modales con el mismo formulario: `product/reservationModal.tsx` (un producto) y `cart/cartReservationModal.tsx` (todo el carrito, una reserva por producto).
+Para reservar hay dos modales con el mismo formulario: `product/reservationModal.tsx` (un producto) y `cart/cartReservationModal.tsx` (todo el carrito). El del carrito envía **un solo pedido** a la API, que lo procesa "todo o nada": si un producto falla, no se crea ninguna reserva y se muestra el motivo.
+
+### Página de contacto
+Los datos que se muestran (dirección, teléfono, correo y horario) están en [`src/constants/contactInfo.ts`](src/constants/contactInfo.ts). **Son valores de ejemplo**: edítalos con los datos reales de la tienda.
 
 ### Imágenes
 Las imágenes de productos están en `public/images/`. Si una imagen no carga, los componentes muestran `public/images/sin-imagen.svg` mediante el evento `onError`. Cuando agregues fotos:

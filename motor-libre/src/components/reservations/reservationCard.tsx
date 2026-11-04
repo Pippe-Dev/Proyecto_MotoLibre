@@ -47,7 +47,19 @@ export function ReservationCard({ reservation, onChange }: ReservationCardProps)
 
   const product = reservation.productos;
   const isActive = reservation.estado === "activo";
-  const maxStock = product?.existencias;
+  // `existencias` ya descuenta lo apartado por esta reserva: lo máximo que se puede
+  // pedir es lo que queda libre más lo que ya tiene reservado.
+  const maxStock =
+    product?.existencias !== undefined
+      ? product.existencias + reservation.cantidad
+      : undefined;
+  const createdAt = reservation.creado_en
+    ? new Date(reservation.creado_en).toLocaleDateString("es-CO", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
 
   const openEdit = (): void => {
     setCantidad(String(reservation.cantidad));
@@ -172,7 +184,7 @@ export function ReservationCard({ reservation, onChange }: ReservationCardProps)
                 onChange={(event) => setCantidad(event.target.value)}
               />
               {maxStock !== undefined && (
-                <small>Disponibles: {maxStock}</small>
+                <small>Máximo que puedes reservar: {maxStock}</small>
               )}
             </div>
             <div className="reservation-edit__field">
@@ -234,6 +246,12 @@ export function ReservationCard({ reservation, onChange }: ReservationCardProps)
                   <dd className="reservation-card__total">
                     {formatPrice(product.precio * reservation.cantidad)}
                   </dd>
+                </div>
+              )}
+              {createdAt && (
+                <div>
+                  <dt>Fecha de reserva</dt>
+                  <dd>{createdAt}</dd>
                 </div>
               )}
               <div>

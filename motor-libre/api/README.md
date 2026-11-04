@@ -26,6 +26,10 @@ npm start       # ejecución normal
 
 Comprueba que funciona abriendo `http://localhost:3001/health`.
 
+### Antes de usarla: aplicar la migración (una sola vez)
+
+El descuento de existencias y la caducidad dependen de un *trigger* en la base de datos. Ejecuta el contenido de [`supabase/migrations/20261104000000_stock_y_caducidad_reservas.sql`](supabase/migrations/20261104000000_stock_y_caducidad_reservas.sql) en Supabase → **SQL Editor**. Es idempotente: puedes repetirlo sin riesgo. Ver [qué hace](#existencias-y-caducidad).
+
 ### Variables de entorno
 
 | Variable | Obligatoria | Por defecto | Descripción |
@@ -34,7 +38,7 @@ Comprueba que funciona abriendo `http://localhost:3001/health`.
 | `SUPABASE_SERVICE_ROLE_KEY` | Sí | — | Clave secreta **service_role** |
 | `PORT` | No | `3001` | Puerto donde escucha la API |
 | `CORS_ORIGIN` | No | `http://localhost:5173` | Orígenes del frontend permitidos, separados por comas |
-| `RESERVATION_TTL_HOURS` | No | — | Reservada para la caducidad de reservas. **Todavía no se usa** |
+| `RESERVATION_TTL_HOURS` | No | — | Horas tras las cuales una reserva **activa** caduca automáticamente (por ejemplo `48`). Si no se define, la caducidad queda desactivada |
 
 > ⚠️ **La clave `service_role` se salta todas las políticas de seguridad de Supabase.** Solo debe estar en este servidor: nunca en el frontend, en capturas, en el chat ni en Git. El archivo `.env` ya está excluido por `.gitignore`.
 
@@ -48,6 +52,7 @@ Todos los datos viajan en JSON. En las rutas que modifican una reserva hay que i
 | `GET` | `/api/reservas?documento=…&estado=…` | Lista las reservas de un documento. `estado` es opcional |
 | `GET` | `/api/reservas/:id?documento=…` | Devuelve una reserva |
 | `POST` | `/api/reservas` | Crea una reserva |
+| `POST` | `/api/reservas/lote` | Crea varias reservas "todo o nada" (el carrito) |
 | `PATCH` | `/api/reservas/:id` | Edita cantidad, correo o celular de una reserva activa |
 | `DELETE` | `/api/reservas/:id?documento=…` | Cancela una reserva activa (no la borra: cambia su estado a `eliminado`) |
 
@@ -68,6 +73,28 @@ Todos los datos viajan en JSON. En las rutas que modifican una reserva hay que i
 ```
 
 Todos los campos son obligatorios. `correo` debe tener formato válido, y `idProducto` y `cantidad` deben ser enteros positivos. Responde `201` con la reserva creada (incluye los datos del producto). La reserva nace con estado `activo`.
+
+### Crear varias reservas a la vez (carrito)
+
+`POST /api/reservas/lote`
+
+```json
+{
+  "nombre": "Juana Pérez",
+  "documento": "123456789",
+  "tipoDocumento": "CC",
+  "correo": "juana@example.com",
+  "celular": "3001234567",
+  "items": [
+    { "idProducto": 8, "cantidad": 1 },
+    { "idProducto": 3, "cantidad": 2 }
+  ]
+}
+```
+
+Los datos del cliente son comunes y `items` lleva los productos (entre 1 y 20). Responde `201` con la lista de reservas creadas.
+
+Es **"todo o nada"**: si un producto no existe o no tiene stock, la API borra las reservas que ya había creado en ese pedido (el trigger devuelve las unidades) y responde `404` o `409` con el mensaje y el `idProducto` que falló. El cliente nunca queda con reservas a medias.
 
 ### Listar reservas
 
@@ -137,18 +164,36 @@ Esta API **no** tiene una ruta para marcar una reserva como `exitoso`: esa acci�
 
 Sin la llave foránea, la consulta de reservas falla, porque pide el producto de cada reserva en la misma solicitud.
 
+## Existencias y caducidad
+
+Un *trigger* de Postgres sobre la tabla `reservas` mantiene `productos.existencias` coherente. Lo hace la base de datos y no la API, así que funciona igual aunque alguien cambie una reserva desde el panel de Supabase:
+
+| Qué pasa con la reserva | Efecto en `existencias` |
+|---|---|
+| Se crea una reserva activa | Se descuentan las unidades |
+| Se cambia la cantidad | Se descuenta o devuelve la diferencia |
+| Pasa de `activo` a `eliminado` (cancelada o caducada) | Se devuelven las unidades |
+| Pasa de `eliminado` a `activo` | Se vuelven a descontar |
+| Se borra una reserva activa | Se devuelven las unidades |
+
+El trigger bloquea la fila del producto mientras actúa, así que **dos personas que reserven la última unidad al mismo tiempo no pueden pasar las dos**: una recibe `409`.
+
+**Caducidad.** Si `RESERVATION_TTL_HOURS` está definida, al arrancar la API y luego cada 15 minutos se cancelan las reservas `activo` con más de esas horas desde `creado_en`. Al pasar a `eliminado`, el trigger devuelve las unidades. Solo corre mientras la API está encendida.
+
 ## Cómo funciona por dentro
 
 ```
 src/
-├── server.js     Carga el .env y levanta el servidor
-├── app.js        Rutas, validación de datos y reglas (propiedad por documento, solo reservas activas)
-└── supabase.js   Acceso a Supabase con la clave service_role
+├── server.js                   Carga el .env, levanta el servidor y arranca la caducidad
+├── app.js                      Rutas, validación de datos y reglas (propiedad por documento, solo reservas activas)
+├── supabase.js                 Acceso a Supabase con la clave service_role
+└── jobs/expireReservations.js  Caducidad periódica de reservas
+supabase/migrations/            SQL que se ejecuta en Supabase (trigger de existencias)
 ```
 
-Igual que en la API de productos, `app.js` recibe un "repositorio" con los métodos `create`, `list`, `findById` y `update`. Así las pruebas usan datos simulados sin tocar Supabase.
+Igual que en la API de productos, `app.js` recibe un "repositorio" con los métodos `create`, `list`, `findById`, `update`, `remove` y `expireOlderThan`. Así las pruebas usan datos simulados sin tocar Supabase.
 
-Al crear una reserva, `supabase.js` primero consulta el producto, valida que existan unidades suficientes y después inserta la reserva.
+Al crear una reserva, `supabase.js` primero consulta el producto para dar un error claro si no existe o no alcanza el stock, y después inserta la reserva. La comprobación definitiva (la que evita el doble reservado) la hace el trigger de la base.
 
 ## Pruebas
 
@@ -156,12 +201,13 @@ Al crear una reserva, `supabase.js` primero consulta el producto, valida que exi
 npm test
 ```
 
-Usan `node --test` con un repositorio simulado: **no necesitan Supabase ni claves**. Cubren la validación de datos, los errores 404 y 409, y las reglas de edición y cancelación.
+Usan `node --test` con un repositorio simulado: **no necesitan Supabase ni claves**. Cubren la validación de datos, los errores 404 y 409, las reglas de edición y cancelación, el pedido "todo o nada" y la caducidad. El trigger SQL **no** está cubierto por estas pruebas; se verifica ejecutándolo en Supabase.
 
 ## Limitaciones conocidas
 
-- **No descuenta existencias** al reservar; solo valida que haya suficientes en ese momento. Entre la validación y la inserción hay una pequeña ventana en la que dos reservas simultáneas podrían pasar. La solución correcta es una función SQL en Supabase que valide y descuente en una sola transacción.
-- **Las reservas no caducan.** `RESERVATION_TTL_HOURS` está reservada pero sin uso; falta una tarea programada.
+- **Hay que aplicar la migración SQL** en cada base de datos. Sin ella la API funciona, pero no descuenta stock ni caduca reservas.
+- **Las reservas anteriores a la migración no descontaron stock.** Hay un bloque opcional al final del `.sql` para corregirlo una vez.
+- **La caducidad solo corre mientras la API está encendida.** Al volver a arrancar se ponen al día.
 - **Sin autenticación:** el documento actúa como identificador y no como credencial. Sirve para una demostración, pero no para producción.
 - No envía correos de confirmación.
 
@@ -172,6 +218,8 @@ Usan `node --test` con un repositorio simulado: **no necesitan Supabase ni clave
 | `502` y en consola "Supabase respondió con estado 401" | La clave service_role es inválida, está sin pegar, es la clave anon, o tiene comillas o espacios |
 | `502` al crear una reserva (en consola, un estado 400 de Supabase) | Falta alguna columna en `reservas` (por ejemplo `tipo_documento`) |
 | `502` solo al **listar** reservas | Falta la llave foránea `reservas.id_producto → productos` |
+| En consola: "No se pudo caducar reservas ... 400" | Falta la columna `creado_en`: no se aplicó la migración SQL |
+| El stock no baja al reservar | No se aplicó la migración SQL (falta el trigger) |
 | "Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY" | No existe el `.env` o le faltan variables |
 | `EADDRINUSE` | El puerto 3001 ya está en uso |
 | Error de CORS en el navegador | El origen del frontend no está en `CORS_ORIGIN` |

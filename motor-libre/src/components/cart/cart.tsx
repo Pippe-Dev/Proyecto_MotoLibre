@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useCart } from "../../context/cartContext";
-import { createOrder } from "../../service/orderService";
 import { CartItem } from "./cartItem";
 import { CartSummary } from "./cartSummary";
 import { CartReservationModal } from "./cartReservationModal";
@@ -11,21 +10,7 @@ const SHOP_PATH = "/catalogo";
 
 export function Cart() {
   const { cartItems, clearCart } = useCart();
-  const [confirmed, setConfirmed] = useState(false);
-  const [checkoutError, setCheckoutError] = useState(false);
   const [showReservationModal, setShowReservationModal] = useState(false);
-
-  const handleCheckout = async (): Promise<void> => {
-    setCheckoutError(false);
-
-    try {
-      await createOrder(cartItems);
-      clearCart();
-      setConfirmed(true);
-    } catch {
-      setCheckoutError(true);
-    }
-  };
 
   const handleReservationSuccess = (): void => {
     clearCart();
@@ -36,12 +21,6 @@ export function Cart() {
       <main className="cart-page">
         <div className="cart-container">
           <h1 className="cart-title">TU CARRITO</h1>
-
-          {confirmed && (
-            <p role="status">
-              Pedido registrado. Pasa a recogerlo y pagarlo en tienda.
-            </p>
-          )}
 
           <section
             className="cart-empty"
@@ -106,9 +85,7 @@ export function Cart() {
           <aside className="cart-summary-container">
             <CartSummary
               cartItems={cartItems}
-              onCheckout={handleCheckout}
               onReserve={() => setShowReservationModal(true)}
-              hasError={checkoutError}
             />
           </aside>
         </div>
