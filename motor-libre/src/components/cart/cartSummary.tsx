@@ -3,6 +3,7 @@ import type { CartItem } from "../../types/cart";
 interface CartSummaryProps {
   cartItems: CartItem[];
   onCheckout: () => void;
+  onReserve: () => void;
   hasError?: boolean;
 }
 
@@ -16,6 +17,7 @@ const formatPrice = (price: number): string =>
 export function CartSummary({
   cartItems,
   onCheckout,
+  onReserve,
   hasError = false,
 }: CartSummaryProps) {
   const subtotal = cartItems.reduce(
@@ -83,6 +85,15 @@ export function CartSummary({
         disabled={hasUnavailableProducts}
       >
         FINALIZAR PEDIDO
+      </button>
+
+      <button
+        type="button"
+        className="cart-summary__reserve"
+        onClick={onReserve}
+        disabled={hasUnavailableProducts}
+      >
+        RESERVAR TODO EL CARRITO
       </button>
 
       <p className="cart-summary__note">

@@ -3,6 +3,7 @@ import { useCart } from "../../context/cartContext";
 import { createOrder } from "../../service/orderService";
 import { CartItem } from "./cartItem";
 import { CartSummary } from "./cartSummary";
+import { CartReservationModal } from "./cartReservationModal";
 import { Link } from "react-router-dom";
 import "./cart.css";
 
@@ -12,6 +13,7 @@ export function Cart() {
   const { cartItems, clearCart } = useCart();
   const [confirmed, setConfirmed] = useState(false);
   const [checkoutError, setCheckoutError] = useState(false);
+  const [showReservationModal, setShowReservationModal] = useState(false);
 
   const handleCheckout = async (): Promise<void> => {
     setCheckoutError(false);
@@ -23,6 +25,10 @@ export function Cart() {
     } catch {
       setCheckoutError(true);
     }
+  };
+
+  const handleReservationSuccess = (): void => {
+    clearCart();
   };
 
   if (cartItems.length === 0) {
@@ -101,11 +107,19 @@ export function Cart() {
             <CartSummary
               cartItems={cartItems}
               onCheckout={handleCheckout}
+              onReserve={() => setShowReservationModal(true)}
               hasError={checkoutError}
             />
           </aside>
         </div>
       </div>
+
+      <CartReservationModal
+        cartItems={cartItems}
+        show={showReservationModal}
+        onClose={() => setShowReservationModal(false)}
+        onSuccess={handleReservationSuccess}
+      />
     </main>
   );
 }

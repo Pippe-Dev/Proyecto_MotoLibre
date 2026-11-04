@@ -408,6 +408,89 @@
   cursor: not-allowed;
 }
 
+.cart-summary__reserve {
+  width: 100%;
+  min-height: 3.3rem;
+
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+
+  border: 2px solid #ffb900;
+  border-radius: 0.35rem;
+
+  background-color: transparent;
+  color: #181818;
+
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.cart-summary__reserve:hover:not(:disabled) {
+  background-color: #fff6df;
+}
+
+.cart-summary__reserve:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.cart-summary__reserve:focus-visible {
+  outline: 3px solid rgba(56, 17, 130, 0.35);
+  outline-offset: 3px;
+}
+
+.cart-summary__reserve:disabled {
+  color: #777777;
+  border-color: #dddddd;
+  cursor: not-allowed;
+}
+
+.cart-reservation-items {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+
+  list-style: none;
+
+  border-radius: 0.3rem;
+  background-color: #f7f7f7;
+
+  font-size: 0.9rem;
+}
+
+.cart-reservation-items li + li {
+  margin-top: 0.3rem;
+}
+
+.cart-success-message {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: 0.3rem;
+  background-color: #d1fae5;
+  color: #065f46;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.reservation-error {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border-radius: 0.3rem;
+  background-color: #fde8e8;
+  color: #b42318;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.reservation-modal {
+  z-index: 1056;
+}
+
 .cart-summary__note {
   display: flex;
   gap: 0.35rem;
