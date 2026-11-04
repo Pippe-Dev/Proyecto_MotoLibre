@@ -8,6 +8,7 @@ export interface ReservationRecord {
   id_producto: number;
   cantidad: number;
   estado: string;
+  creado_en?: string;
   productos: {
     nombre: string;
     precio: number;

@@ -512,3 +512,89 @@
     padding: 3rem 1rem;
   }
 }
+
+/* ============================= */
+/* CONTACTO                      */
+/* ============================= */
+
+.contact-page {
+  max-width: 920px;
+}
+
+.contact-page__intro {
+  margin: 0.25rem 0 1.5rem;
+  color: var(--color-muted);
+}
+
+.contact-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  padding: 0;
+  margin: 0 0 2rem;
+  list-style: none;
+}
+
+.contact-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) * 1.5);
+  background-color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.contact-card__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 1.2rem;
+}
+
+.contact-card__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.contact-card__value {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.contact-steps {
+  padding: 1.5rem;
+  border-radius: calc(var(--radius) * 1.5);
+  background-color: var(--color-surface);
+}
+
+.contact-steps__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.contact-steps__list {
+  margin: 0 0 1.25rem;
+  padding-left: 1.25rem;
+}
+
+.contact-steps__list li + li {
+  margin-top: 0.35rem;
+}
+
+.contact-steps__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

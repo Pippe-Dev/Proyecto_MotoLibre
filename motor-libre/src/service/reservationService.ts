@@ -1,4 +1,8 @@
-import type { ReservationInput, ReservationUpdateInput } from "../types/reservation";
+import type {
+  ReservationBatchInput,
+  ReservationInput,
+  ReservationUpdateInput,
+} from "../types/reservation";
 import type { ReservationRecord } from "../types/reservationRecord";
 
 const API_URL =
@@ -79,6 +83,24 @@ export async function cancelReservation(
 
   if (!response.ok) {
     throw await readApiError(response, "No se pudo cancelar la reserva");
+  }
+
+  return response.json();
+}
+
+// Reserva varios productos a la vez. La API es "todo o nada": si uno falla,
+// no queda ninguna reserva creada y el error trae el motivo.
+export async function createReservationsBatch(
+  input: ReservationBatchInput
+): Promise<ReservationRecord[]> {
+  const response = await fetch(`${API_URL}/reservas/lote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw await readApiError(response, "No se pudieron registrar las reservas");
   }
 
   return response.json();
