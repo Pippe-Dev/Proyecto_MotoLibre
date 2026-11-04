@@ -257,3 +257,144 @@ test("PATCH /api/reservas/:id valida existencias y datos", async () => {
     assert.equal((await send({})).status, 400);
   });
 });
+
+const clientData = {
+  nombre: "Juana Pérez",
+  documento: "123456789",
+  tipoDocumento: "CC",
+  correo: "juana@example.com",
+  celular: "3001234567",
+};
+
+async function postBatch(url, body) {
+  return fetch(`${url}/api/reservas/lote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+test("POST /api/reservas/lote crea todas las reservas del pedido", async () => {
+  const created = [];
+  const repository = {
+    async create(reservation) {
+      created.push(reservation);
+      return { id_reserva: created.length, ...reservation };
+    },
+  };
+
+  await withServer(repository, async (url) => {
+    const response = await postBatch(url, {
+      ...clientData,
+      items: [
+        { idProducto: 1, cantidad: 2 },
+        { idProducto: 2, cantidad: 1 },
+      ],
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal((await response.json()).length, 2);
+  });
+
+  assert.deepEqual(
+    created.map((item) => [item.idProducto, item.cantidad]),
+    [[1, 2], [2, 1]],
+  );
+});
+
+test("POST /api/reservas/lote deshace lo creado si un producto falla", async () => {
+  const removed = [];
+  let calls = 0;
+  const repository = {
+    async create(reservation) {
+      calls += 1;
+      if (calls === 3) {
+        const error = new Error("No hay existencias suficientes para la cantidad solicitada.");
+        error.code = "INSUFFICIENT_STOCK";
+        throw error;
+      }
+      return { id_reserva: 100 + calls, ...reservation };
+    },
+    async remove(id) {
+      removed.push(id);
+    },
+  };
+
+  await withServer(repository, async (url) => {
+    const response = await postBatch(url, {
+      ...clientData,
+      items: [
+        { idProducto: 1, cantidad: 1 },
+        { idProducto: 2, cantidad: 1 },
+        { idProducto: 3, cantidad: 99 },
+      ],
+    });
+
+    assert.equal(response.status, 409);
+    const body = await response.json();
+    assert.equal(body.idProducto, 3);
+  });
+
+  assert.deepEqual(removed, [101, 102]);
+});
+
+test("POST /api/reservas/lote valida items y datos del cliente", async () => {
+  await withServer({ async create() { throw new Error("no debe llamarse"); } }, async (url) => {
+    assert.equal((await postBatch(url, { ...clientData, items: [] })).status, 400);
+    assert.equal((await postBatch(url, { ...clientData })).status, 400);
+    assert.equal(
+      (await postBatch(url, { ...clientData, items: [{ idProducto: 1, cantidad: 0 }] })).status,
+      400,
+    );
+    assert.equal(
+      (await postBatch(url, { ...clientData, correo: "malo", items: [{ idProducto: 1, cantidad: 1 }] })).status,
+      400,
+    );
+  });
+});
+
+test("PATCH /api/reservas/:id traduce INSUFFICIENT_STOCK de la base a 409", async () => {
+  const repository = {
+    async findById() { return activeReservation; },
+    async update() {
+      const error = new Error("No hay existencias suficientes para la cantidad solicitada.");
+      error.code = "INSUFFICIENT_STOCK";
+      throw error;
+    },
+  };
+
+  await withServer(repository, async (url) => {
+    const response = await fetch(`${url}/api/reservas/5`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documento: "123456789", cantidad: 3 }),
+    });
+    assert.equal(response.status, 409);
+  });
+});
+
+test("PATCH /api/reservas/:id solo exige stock para el aumento, no la cantidad total", async () => {
+  const updates = [];
+  // La reserva ya aparta 2 unidades y quedan 3 libres: puede pasar a 5.
+  const repository = {
+    async findById() { return activeReservation; },
+    async update(id, fields) {
+      updates.push(fields);
+      return { ...activeReservation, ...fields };
+    },
+  };
+
+  await withServer(repository, async (url) => {
+    const send = (cantidad) =>
+      fetch(`${url}/api/reservas/5`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documento: "123456789", cantidad }),
+      });
+
+    assert.equal((await send(5)).status, 200);
+    assert.equal((await send(6)).status, 409);
+  });
+
+  assert.deepEqual(updates, [{ cantidad: 5 }]);
+});

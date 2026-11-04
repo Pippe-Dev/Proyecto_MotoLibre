@@ -14,6 +14,35 @@ function getSupabaseConfig() {
   return { baseUrl: `${supabaseUrl.replace(/\/+$/, "")}/`, supabaseKey };
 }
 
+const DB_ERROR_MESSAGES = {
+  PRODUCT_NOT_FOUND: "Producto no encontrado.",
+  INSUFFICIENT_STOCK: "No hay existencias suficientes para la cantidad solicitada.",
+};
+
+// El trigger de la base rechaza operaciones con raise exception 'CODIGO'.
+// PostgREST lo devuelve como { message: "CODIGO" }; aquí se convierte en un
+// error con `code`, que app.js traduce a 404 o 409.
+async function buildSupabaseError(response, fallbackMessage) {
+  let dbCode = null;
+
+  try {
+    const body = await response.json();
+    if (typeof body?.message === "string" && DB_ERROR_MESSAGES[body.message]) {
+      dbCode = body.message;
+    }
+  } catch {
+    // La respuesta no era JSON: se usa el mensaje genérico.
+  }
+
+  if (dbCode) {
+    const error = new Error(DB_ERROR_MESSAGES[dbCode]);
+    error.code = dbCode;
+    return error;
+  }
+
+  return new Error(`Supabase respondió con estado ${response.status} ${fallbackMessage}`);
+}
+
 function buildEndpoint(baseUrl, table) {
   return new URL(`rest/v1/${encodeURIComponent(table)}`, baseUrl);
 }
@@ -86,9 +115,7 @@ async function insertReservation(reservation) {
   });
 
   if (!response.ok) {
-    throw new Error(
-      `Supabase respondió con estado ${response.status} al crear la reserva.`,
-    );
+    throw await buildSupabaseError(response, "al crear la reserva.");
   }
 
   const created = await response.json();
@@ -174,10 +201,56 @@ export const reservationsRepository = {
     });
 
     if (!response.ok) {
-      throw new Error(`Supabase respondió con estado ${response.status} al actualizar la reserva.`);
+      throw await buildSupabaseError(response, "al actualizar la reserva.");
     }
 
     const updated = await response.json();
     return updated[0] ?? null;
+  },
+
+  // Borrado físico. Se usa para deshacer reservas de un lote que falló a medias;
+  // el trigger de la base devuelve las existencias.
+  async remove(id) {
+    const { baseUrl, supabaseKey } = getSupabaseConfig();
+    const endpoint = buildEndpoint(baseUrl, RESERVATIONS_TABLE);
+    endpoint.searchParams.set("id_reserva", `eq.${id}`);
+
+    const response = await fetch(endpoint, {
+      method: "DELETE",
+      headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` },
+    });
+
+    if (!response.ok) {
+      throw await buildSupabaseError(response, "al eliminar la reserva.");
+    }
+  },
+
+  // Cancela las reservas activas creadas hace más de `hours` horas.
+  // Devuelve cuántas se cancelaron; el trigger devuelve las existencias.
+  async expireOlderThan(hours) {
+    const { baseUrl, supabaseKey } = getSupabaseConfig();
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    const endpoint = buildEndpoint(baseUrl, RESERVATIONS_TABLE);
+    endpoint.searchParams.set("estado", "eq.activo");
+    endpoint.searchParams.set("creado_en", `lt.${cutoff}`);
+    endpoint.searchParams.set("select", "id_reserva");
+
+    const response = await fetch(endpoint, {
+      method: "PATCH",
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ estado: "eliminado" }),
+    });
+
+    if (!response.ok) {
+      throw await buildSupabaseError(response, "al caducar reservas.");
+    }
+
+    const expired = await response.json();
+    return expired.length;
   },
 };

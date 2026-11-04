@@ -50,6 +50,55 @@ function parseReservationBody(body) {
   };
 }
 
+const MAX_BATCH_ITEMS = 20;
+
+// Valida un pedido con varios productos: los datos del cliente son comunes
+// y cada elemento de `items` aporta idProducto y cantidad.
+function parseBatchBody(body) {
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return { errors: ["El campo 'items' debe ser una lista con al menos un producto."] };
+  }
+
+  if (body.items.length > MAX_BATCH_ITEMS) {
+    return { errors: [`No se pueden reservar más de ${MAX_BATCH_ITEMS} productos a la vez.`] };
+  }
+
+  const reservations = [];
+  const errors = [];
+
+  body.items.forEach((item, index) => {
+    const { reservation, errors: itemErrors } = parseReservationBody({
+      ...body,
+      idProducto: item?.idProducto,
+      cantidad: item?.cantidad,
+    });
+
+    if (itemErrors) {
+      errors.push(...itemErrors.map((message) => `Producto ${index + 1}: ${message}`));
+    } else {
+      reservations.push(reservation);
+    }
+  });
+
+  return errors.length > 0 ? { errors: [...new Set(errors)] } : { reservations };
+}
+
+// Traduce los errores de negocio (producto inexistente, sin stock) a respuestas HTTP.
+// Devuelve true si respondió; si no, el error debe seguir a next().
+function respondDomainError(error, response, extra = {}) {
+  if (error.code === "PRODUCT_NOT_FOUND") {
+    response.status(404).json({ error: error.message, ...extra });
+    return true;
+  }
+
+  if (error.code === "INSUFFICIENT_STOCK") {
+    response.status(409).json({ error: error.message, ...extra });
+    return true;
+  }
+
+  return false;
+}
+
 function parseReservationUpdate(body) {
   const errors = [];
   const fields = {};
@@ -168,10 +217,12 @@ export function createApp(repository = reservationsRepository) {
         return;
       }
 
+      // `existencias` ya descuenta lo que esta reserva tiene apartado, así que solo
+      // hay que cubrir el aumento respecto a la cantidad actual.
       if (
         fields.cantidad !== undefined &&
         reservation.productos?.existencias !== undefined &&
-        fields.cantidad > reservation.productos.existencias
+        fields.cantidad - reservation.cantidad > reservation.productos.existencias
       ) {
         response
           .status(409)
@@ -182,7 +233,9 @@ export function createApp(repository = reservationsRepository) {
       const updated = await repository.update(reservation.id_reserva, fields);
       response.json(updated);
     } catch (error) {
-      next(error);
+      if (!respondDomainError(error, response)) {
+        next(error);
+      }
     }
   });
 
@@ -239,17 +292,47 @@ export function createApp(repository = reservationsRepository) {
       const created = await repository.create(reservation);
       response.status(201).json(created);
     } catch (error) {
-      if (error.code === "PRODUCT_NOT_FOUND") {
-        response.status(404).json({ error: error.message });
-        return;
+      if (!respondDomainError(error, response)) {
+        next(error);
+      }
+    }
+  });
+
+  // Reserva varios productos en una sola operación "todo o nada": si uno falla,
+  // se deshacen los que ya se habían creado y no queda ninguna reserva a medias.
+  app.post("/api/reservas/lote", async (request, response, next) => {
+    const { reservations, errors } = parseBatchBody(request.body ?? {});
+
+    if (errors) {
+      response.status(400).json({ error: errors.join(" ") });
+      return;
+    }
+
+    const created = [];
+
+    try {
+      for (const reservation of reservations) {
+        created.push(await repository.create(reservation));
       }
 
-      if (error.code === "INSUFFICIENT_STOCK") {
-        response.status(409).json({ error: error.message });
-        return;
+      response.status(201).json(created);
+    } catch (error) {
+      const failedItem = reservations[created.length];
+
+      for (const done of created) {
+        try {
+          await repository.remove(done.id_reserva);
+        } catch (rollbackError) {
+          console.error(
+            `No se pudo deshacer la reserva ${done.id_reserva}:`,
+            rollbackError.message,
+          );
+        }
       }
 
-      next(error);
+      if (!respondDomainError(error, response, { idProducto: failedItem?.idProducto })) {
+        next(error);
+      }
     }
   });
 
