@@ -1,4 +1,4 @@
-import type { ReservationInput } from "../types/reservation";
+import type { ReservationInput, ReservationUpdateInput } from "../types/reservation";
 import type { ReservationRecord } from "../types/reservationRecord";
 
 const API_URL =
@@ -37,3 +37,49 @@ export async function getReservationsByDocumento(
   return response.json();
 }
 
+
+async function readApiError(response: Response, fallback: string): Promise<Error> {
+  try {
+    const body = await response.json();
+    if (typeof body?.error === "string") {
+      return new Error(body.error);
+    }
+  } catch {
+    // La respuesta no era JSON: se usa el mensaje por defecto.
+  }
+  return new Error(fallback);
+}
+
+export async function updateReservation(
+  id: number,
+  documento: string,
+  changes: ReservationUpdateInput
+): Promise<ReservationRecord> {
+  const response = await fetch(`${API_URL}/reservas/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documento, ...changes }),
+  });
+
+  if (!response.ok) {
+    throw await readApiError(response, "No se pudo actualizar la reserva");
+  }
+
+  return response.json();
+}
+
+export async function cancelReservation(
+  id: number,
+  documento: string
+): Promise<ReservationRecord> {
+  const params = new URLSearchParams({ documento });
+  const response = await fetch(`${API_URL}/reservas/${id}?${params.toString()}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw await readApiError(response, "No se pudo cancelar la reserva");
+  }
+
+  return response.json();
+}

@@ -159,3 +159,101 @@ test("GET /api/reservas devuelve las reservas del documento", async () => {
   assert.deepEqual(await response.json(), listedReservations);
   assert.deepEqual(listCalls.at(-1), { documento: "123456789", estado: "activo" });
 });
+
+async function withServer(repository, run) {
+  const instance = createApp(repository).listen(0);
+  await new Promise((resolve) => instance.once("listening", resolve));
+  try {
+    await run(`http://127.0.0.1:${instance.address().port}`);
+  } finally {
+    await new Promise((resolve, reject) => {
+      instance.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+}
+
+const activeReservation = {
+  id_reserva: 5,
+  ...validPayload,
+  tipo_documento: "CC",
+  id_producto: 7,
+  estado: "activo",
+  productos: { nombre: "Casco", precio: 100000, existencias: 3 },
+};
+
+test("DELETE /api/reservas/:id cancela una reserva activa y notifica", async () => {
+  const updates = [];
+  const repository = {
+    async findById() { return activeReservation; },
+    async update(id, fields) {
+      updates.push({ id, fields });
+      return { ...activeReservation, ...fields };
+    },
+  };
+
+  await withServer(repository, async (url) => {
+    const response = await fetch(`${url}/api/reservas/5?documento=123456789`, { method: "DELETE" });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).estado, "eliminado");
+  });
+
+  assert.deepEqual(updates, [{ id: 5, fields: { estado: "eliminado" } }]);
+});
+
+test("DELETE /api/reservas/:id no revela reservas de otro documento", async () => {
+  const repository = { async findById() { return activeReservation; } };
+
+  await withServer(repository, async (url) => {
+    const response = await fetch(`${url}/api/reservas/5?documento=999`, { method: "DELETE" });
+    assert.equal(response.status, 404);
+  });
+});
+
+test("DELETE /api/reservas/:id rechaza reservas que ya no están activas", async () => {
+  const repository = { async findById() { return { ...activeReservation, estado: "exitoso" }; } };
+
+  await withServer(repository, async (url) => {
+    const response = await fetch(`${url}/api/reservas/5?documento=123456789`, { method: "DELETE" });
+    assert.equal(response.status, 409);
+  });
+});
+
+test("PATCH /api/reservas/:id actualiza cantidad y contacto", async () => {
+  const updates = [];
+  const repository = {
+    async findById() { return activeReservation; },
+    async update(id, fields) {
+      updates.push(fields);
+      return { ...activeReservation, ...fields };
+    },
+  };
+
+  await withServer(repository, async (url) => {
+    const response = await fetch(`${url}/api/reservas/5`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documento: "123456789", cantidad: 3, celular: " 3109999999 " }),
+    });
+    assert.equal(response.status, 200);
+  });
+
+  assert.deepEqual(updates, [{ cantidad: 3, celular: "3109999999" }]);
+});
+
+test("PATCH /api/reservas/:id valida existencias y datos", async () => {
+  const repository = { async findById() { return activeReservation; } };
+
+  await withServer(repository, async (url) => {
+    const send = (body) =>
+      fetch(`${url}/api/reservas/5`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documento: "123456789", ...body }),
+      });
+
+    assert.equal((await send({ cantidad: 10 })).status, 409);
+    assert.equal((await send({ cantidad: 0 })).status, 400);
+    assert.equal((await send({ correo: "malo" })).status, 400);
+    assert.equal((await send({})).status, 400);
+  });
+});

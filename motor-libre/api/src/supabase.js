@@ -21,7 +21,7 @@ function buildEndpoint(baseUrl, table) {
 async function findProductById(id) {
   const { baseUrl, supabaseKey } = getSupabaseConfig();
   const endpoint = buildEndpoint(baseUrl, PRODUCTS_TABLE);
-  endpoint.searchParams.set("select", "id_producto,existencias");
+  endpoint.searchParams.set("select", "id_producto,nombre,precio,imagen,existencias");
   endpoint.searchParams.set("id_producto", `eq.${id}`);
 
   const response = await fetch(endpoint, {
@@ -113,7 +113,7 @@ export const reservationsRepository = {
       throw error;
     }
 
-    return insertReservation({
+    const created = await insertReservation({
       nombre,
       documento,
       tipo_documento: tipoDocumento,
@@ -123,9 +123,61 @@ export const reservationsRepository = {
       cantidad,
       estado: "activo",
     });
+
+    return {
+      ...created,
+      productos: { nombre: product.nombre, precio: product.precio, imagen: product.imagen },
+    };
   },
 
   list(filters) {
     return listReservations(filters);
+  },
+
+  async findById(id) {
+    const { baseUrl, supabaseKey } = getSupabaseConfig();
+    const endpoint = buildEndpoint(baseUrl, RESERVATIONS_TABLE);
+    endpoint.searchParams.set("select", "*,productos(nombre,precio,imagen,existencias)");
+    endpoint.searchParams.set("id_reserva", `eq.${id}`);
+
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase respondió con estado ${response.status} al consultar la reserva.`);
+    }
+
+    const reservations = await response.json();
+    return reservations[0] ?? null;
+  },
+
+  async update(id, fields) {
+    const { baseUrl, supabaseKey } = getSupabaseConfig();
+    const endpoint = buildEndpoint(baseUrl, RESERVATIONS_TABLE);
+    endpoint.searchParams.set("id_reserva", `eq.${id}`);
+    endpoint.searchParams.set("select", "*,productos(nombre,precio,imagen)");
+
+    const response = await fetch(endpoint, {
+      method: "PATCH",
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(fields),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Supabase respondió con estado ${response.status} al actualizar la reserva.`);
+    }
+
+    const updated = await response.json();
+    return updated[0] ?? null;
   },
 };

@@ -12,5 +12,6 @@ export interface ReservationRecord {
     nombre: string;
     precio: number;
     imagen: string | null;
+    existencias?: number;
   } | null;
 }

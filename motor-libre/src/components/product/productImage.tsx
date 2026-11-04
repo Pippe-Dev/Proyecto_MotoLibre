@@ -82,7 +82,15 @@ export function ProductImage({
           </>
         )}
 
-         <img src={currentImage} alt={product.name} />
+         <img
+          src={currentImage}
+          alt={product.name}
+          referrerPolicy="no-referrer"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = "/images/sin-imagen.svg";
+          }}
+        />
 
         {showZoom && (
           <div
@@ -111,7 +119,16 @@ export function ProductImage({
               }`}
               onClick={() => setSelectedImage(index)}
             >
-              <img className="thumbnail-image" src={image} alt={product.name} />
+              <img
+                className="thumbnail-image"
+                src={image}
+                alt={product.name}
+                referrerPolicy="no-referrer"
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = "/images/sin-imagen.svg";
+                }}
+              />
             </button>
           ))}
 

@@ -164,8 +164,13 @@ export function CatalogPage() {
           >
             <div className="product-card__image">
               <img
-                src={product.images[0]}
+                src={product.images[0] || "/images/sin-imagen.svg"}
                 alt={product.name}
+                referrerPolicy="no-referrer"
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = "/images/sin-imagen.svg";
+                }}
               />
             </div>
 

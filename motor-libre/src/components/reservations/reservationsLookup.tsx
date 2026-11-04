@@ -2,32 +2,11 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 
 import type { ReservationRecord } from "../../types/reservationRecord";
-import {
-  RESERVATION_STATUS_OPTIONS,
-  getReservationStatusLabel,
-} from "../../constants/reservationStatus";
+import { RESERVATION_STATUS_OPTIONS } from "../../constants/reservationStatus";
 import { getReservationsByDocumento } from "../../service/reservationService";
+import { ReservationCard } from "./reservationCard";
 
 import "./reservationsLookup.css";
-
-const formatPrice = (price: number): string =>
-  price.toLocaleString("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  });
-
-function getStatusModifierClass(estado: string): string {
-  if (estado === "exitoso") {
-    return "reservation-status--entregado";
-  }
-
-  if (estado === "eliminado") {
-    return "reservation-status--cancelado";
-  }
-
-  return "reservation-status--pagado";
-}
 
 export function ReservationsLookup() {
   const [documento, setDocumento] = useState("");
@@ -64,6 +43,16 @@ export function ReservationsLookup() {
     }
   };
 
+  const handleReservationChange = (updated: ReservationRecord): void => {
+    setResults((current) =>
+      current
+        ? current.map((item) =>
+            item.id_reserva === updated.id_reserva ? updated : item
+          )
+        : current
+    );
+  };
+
   const handleClear = (): void => {
     setDocumento("");
     setEstado("");
@@ -72,25 +61,34 @@ export function ReservationsLookup() {
     setSearched(false);
   };
 
-  return (
-    <main className="container py-4">
-      <h1 className="page-title">Consultar reservas</h1>
+  const activeCount =
+    results?.filter((item) => item.estado === "activo").length ?? 0;
 
-      <form
-        className="reservation-lookup__form"
-        onSubmit={handleSubmit}
-      >
-        <div className="reservation-lookup__field">
+  return (
+    <main className="container py-4 reservation-page">
+      <header className="reservation-page__header">
+        <h1 className="page-title">Mis reservas</h1>
+        <p className="reservation-page__subtitle">
+          Consulta, edita o cancela tus reservas con tu número de documento.
+        </p>
+      </header>
+
+      <form className="reservation-lookup__form" onSubmit={handleSubmit}>
+        <div className="reservation-lookup__field reservation-lookup__field--grow">
           <label className="form-label" htmlFor="lookup-documento">
             Número de documento
           </label>
-          <input
-            id="lookup-documento"
-            className="form-control"
-            value={documento}
-            onChange={(event) => setDocumento(event.target.value)}
-            placeholder="Ej: 123456789"
-          />
+          <div className="reservation-lookup__input">
+            <i className="bi bi-person-vcard" aria-hidden="true" />
+            <input
+              id="lookup-documento"
+              className="form-control"
+              value={documento}
+              onChange={(event) => setDocumento(event.target.value)}
+              placeholder="Ej: 123456789"
+              inputMode="numeric"
+            />
+          </div>
         </div>
 
         <div className="reservation-lookup__field">
@@ -112,22 +110,31 @@ export function ReservationsLookup() {
           </select>
         </div>
 
-        <button
-          type="submit"
-          className="btn btn-primary reservation-lookup__submit"
-          disabled={documento.trim() === ""}
-        >
-          Buscar
-        </button>
+        <div className="reservation-lookup__buttons">
+          <button
+            type="submit"
+            className="btn btn-primary reservation-lookup__submit"
+            disabled={documento.trim() === "" || loading}
+          >
+            <i className="bi bi-search" aria-hidden="true" /> Buscar
+          </button>
 
-        <button
-          type="button"
-          className="btn btn-outline-secondary reservation-lookup__submit"
-          onClick={handleClear}
-        >
-          Limpiar
-        </button>
+          <button
+            type="button"
+            className="btn btn-outline-secondary reservation-lookup__submit"
+            onClick={handleClear}
+          >
+            Limpiar
+          </button>
+        </div>
       </form>
+
+      {!searched && !loading && (
+        <div className="reservation-empty">
+          <i className="bi bi-bag-heart" aria-hidden="true" />
+          <p>Ingresa tu documento para ver tus reservas.</p>
+        </div>
+      )}
 
       {loading && (
         <div className="reservation-lookup__results" aria-busy="true">
@@ -144,42 +151,32 @@ export function ReservationsLookup() {
       )}
 
       {!loading && !error && searched && results?.length === 0 && (
-        <p className="state-message" role="status">
-          No se encontraron reservas para ese documento.
-        </p>
+        <div className="reservation-empty" role="status">
+          <i className="bi bi-inbox" aria-hidden="true" />
+          <p>No se encontraron reservas para ese documento.</p>
+        </div>
       )}
 
       {!loading && !error && results && results.length > 0 && (
-        <ul className="reservation-lookup__results" role="list">
-          {results.map((reservation) => (
-            <li className="reservation-card" key={reservation.id_reserva}>
-              <div className="reservation-card__info">
-                <h2 className="reservation-card__name">
-                  {reservation.productos?.nombre ?? "Producto no disponible"}
-                </h2>
-                <span className="reservation-card__detail">
-                  Cantidad: {reservation.cantidad}
-                </span>
-                {reservation.productos && (
-                  <span className="reservation-card__detail">
-                    Subtotal:{" "}
-                    {formatPrice(
-                      reservation.productos.precio * reservation.cantidad
-                    )}
-                  </span>
-                )}
-              </div>
+        <>
+          <p className="reservation-summary" role="status">
+            <strong>{results.length}</strong>{" "}
+            {results.length === 1 ? "reserva encontrada" : "reservas encontradas"}
+            {" · "}
+            <strong>{activeCount}</strong>{" "}
+            {activeCount === 1 ? "activa" : "activas"}
+          </p>
 
-              <span
-                className={`reservation-status ${getStatusModifierClass(
-                  reservation.estado
-                )}`}
-              >
-                {getReservationStatusLabel(reservation.estado)}
-              </span>
-            </li>
-          ))}
-        </ul>
+          <ul className="reservation-lookup__results" role="list">
+            {results.map((reservation) => (
+              <ReservationCard
+                key={reservation.id_reserva}
+                reservation={reservation}
+                onChange={handleReservationChange}
+              />
+            ))}
+          </ul>
+        </>
       )}
     </main>
   );

@@ -7,3 +7,9 @@ export interface ReservationInput {
   idProducto: number;
   cantidad: number;
 }
+
+export interface ReservationUpdateInput {
+  cantidad?: number;
+  correo?: string;
+  celular?: string;
+}

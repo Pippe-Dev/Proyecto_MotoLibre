@@ -53,6 +53,11 @@ export function CartItem({ item }: CartItemProps) {
               src={product.images[0]}
               alt={product.name}
               className="cart-item__image"
+              referrerPolicy="no-referrer"
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = "/images/sin-imagen.svg";
+              }}
             />
           ) : (
             <div className="cart-item__image-placeholder">
