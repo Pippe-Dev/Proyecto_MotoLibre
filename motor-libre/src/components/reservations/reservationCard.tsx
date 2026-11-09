@@ -33,11 +33,13 @@ function getStatusIcon(estado: string): string {
 interface ReservationCardProps {
   reservation: ReservationRecord;
   onChange: (updated: ReservationRecord) => void;
+  // true cuando la reserva se muestra desde la cuenta con sesión iniciada.
+  byAccount?: boolean;
 }
 
 type Mode = "view" | "edit" | "confirm-cancel";
 
-export function ReservationCard({ reservation, onChange }: ReservationCardProps) {
+export function ReservationCard({ reservation, onChange, byAccount = false }: ReservationCardProps) {
   const [mode, setMode] = useState<Mode>("view");
   const [cantidad, setCantidad] = useState(String(reservation.cantidad));
   const [celular, setCelular] = useState(reservation.celular);
@@ -97,7 +99,7 @@ export function ReservationCard({ reservation, onChange }: ReservationCardProps)
     try {
       const updated = await updateReservation(
         reservation.id_reserva,
-        reservation.documento,
+        byAccount ? null : reservation.documento,
         {
           cantidad: parsedCantidad,
           celular: celular.trim(),
@@ -122,7 +124,7 @@ export function ReservationCard({ reservation, onChange }: ReservationCardProps)
     try {
       const updated = await cancelReservation(
         reservation.id_reserva,
-        reservation.documento
+        byAccount ? null : reservation.documento
       );
       onChange({ ...reservation, ...updated });
       setMode("view");

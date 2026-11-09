@@ -71,11 +71,30 @@ async function findProductById(id) {
   return products[0] ?? null;
 }
 
-async function listReservations({ documento, estado }) {
+// Valida un access token de Supabase Auth y devuelve { id, email }, o null si no es válido.
+export async function verifyAccessToken(token) {
+  const { baseUrl, supabaseKey } = getSupabaseConfig();
+  const response = await fetch(new URL("auth/v1/user", baseUrl), {
+    headers: { apikey: supabaseKey, Authorization: `Bearer ${token}` },
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Supabase Auth respondió con estado ${response.status}.`);
+  }
+
+  const user = await response.json();
+  return user?.id ? { id: user.id, email: user.email ?? null } : null;
+}
+
+async function listReservations({ userId, estado }) {
   const { baseUrl, supabaseKey } = getSupabaseConfig();
   const endpoint = buildEndpoint(baseUrl, RESERVATIONS_TABLE);
   endpoint.searchParams.set("select", "*,productos(nombre,precio,imagen)");
-  endpoint.searchParams.set("documento", `eq.${documento}`);
+  endpoint.searchParams.set("user_id", `eq.${userId}`);
   endpoint.searchParams.set("order", "id_reserva.desc");
 
   if (estado) {
@@ -123,7 +142,7 @@ async function insertReservation(reservation) {
 }
 
 export const reservationsRepository = {
-  async create({ nombre, documento, tipoDocumento, correo, celular, idProducto, cantidad }) {
+  async create({ nombre, documento, tipoDocumento, correo, celular, idProducto, cantidad, userId }) {
     const product = await findProductById(idProducto);
 
     if (!product) {
@@ -149,6 +168,7 @@ export const reservationsRepository = {
       id_producto: idProducto,
       cantidad,
       estado: "activo",
+      ...(userId ? { user_id: userId } : {}),
     });
 
     return {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useCart } from "../../context/cartContext";
 import { CartItem } from "./cartItem";
 import { CartSummary } from "./cartSummary";
+import { useRequireLogin } from "../../hooks/useRequireLogin";
 import { CartReservationModal } from "./cartReservationModal";
 import { Link } from "react-router-dom";
 import "./cart.css";
@@ -11,6 +12,7 @@ const SHOP_PATH = "/catalogo";
 export function Cart() {
   const { cartItems, clearCart } = useCart();
   const [showReservationModal, setShowReservationModal] = useState(false);
+  const requireLogin = useRequireLogin();
 
   const handleReservationSuccess = (): void => {
     clearCart();
@@ -85,7 +87,7 @@ export function Cart() {
           <aside className="cart-summary-container">
             <CartSummary
               cartItems={cartItems}
-              onReserve={() => setShowReservationModal(true)}
+              onReserve={() => requireLogin() && setShowReservationModal(true)}
             />
           </aside>
         </div>

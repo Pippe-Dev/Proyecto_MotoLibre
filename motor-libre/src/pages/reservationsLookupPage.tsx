@@ -1,5 +1,5 @@
-import { ReservationsLookup } from "../components/reservations/reservationsLookup";
+import { AccountReservations } from "../components/reservations/accountReservations";
 
 export function ReservationsLookupPage() {
-  return <ReservationsLookup />;
+  return <AccountReservations />;
 }

@@ -130,7 +130,7 @@ Abre **http://localhost:5173** en el navegador.
 | `/catalogo` | Catálogo de productos con filtros por marca y modelo |
 | `/producto/:id` | Detalle de un producto, con opción de añadir al carrito o reservar |
 | `/carrito` | Carrito de compras, con opción de reservar todos los productos |
-| `/reservas` | **Mis reservas**: consulta por documento, edición y cancelación |
+| `/reservas` | **Mis reservas** (requiere sesión): consulta, edición y cancelación |
 | `/contacto` | Datos de contacto, horario y pasos para reservar |
 
 ---
@@ -140,7 +140,7 @@ Abre **http://localhost:5173** en el navegador.
 1. El cliente elige un producto (o varios desde el carrito) y llena el formulario con nombre, tipo y número de documento, correo, celular y cantidad.
 2. La API de reservas comprueba que el producto exista y que haya existencias suficientes. Si el carrito tiene varios productos, la reserva es **"todo o nada"**: si uno falla (por ejemplo, se agotó), no se crea ninguna y el cliente ve el motivo.
 3. Se guarda la reserva con estado **activo** (se muestra como "Pagado") y **se descuentan las unidades** del stock del producto.
-4. Más tarde, en `/reservas`, el cliente escribe su documento y ve sus reservas. Mientras estén activas, puede **editarlas** (cantidad, correo, celular) o **cancelarlas**. Al cancelar o reducir la cantidad, las unidades **vuelven al stock**.
+4. Más tarde, en `/reservas`, el cliente (con sesión iniciada) ve sus reservas. Mientras estén activas, puede **editarlas** (cantidad, correo, celular) o **cancelarlas**. Al cancelar o reducir la cantidad, las unidades **vuelven al stock**.
 5. Si una reserva activa supera `RESERVATION_TTL_HOURS` (48 h en el ejemplo) sin completarse, la API la **caduca** sola y devuelve las unidades al stock.
 
 Estados de una reserva:
@@ -234,7 +234,7 @@ npm run build   # comprueba los tipos y genera la versión de producción
 - **La caducidad solo corre mientras la API de reservas está encendida.** Si estuvo apagada, caducará las reservas vencidas en cuanto vuelva a arrancar (y luego cada 15 minutos).
 - Las reservas que ya existían **antes de aplicar la migración** no descontaron stock. Hay un bloque opcional al final del archivo `.sql` para corregirlo una sola vez.
 - Marcar una reserva como **Entregada** (`exitoso`) se hace a mano en Supabase; la API no tiene esa ruta.
-- **No hay inicio de sesión.** Quien conozca un número de documento puede ver y cancelar sus reservas. Es suficiente para una demostración, pero no para producción.
+- **Las reservas anteriores a las cuentas** no tienen usuario asociado y no se pueden consultar desde la web.
 - No se envían correos de confirmación.
 
 ---

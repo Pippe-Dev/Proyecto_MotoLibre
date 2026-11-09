@@ -44,17 +44,17 @@ El descuento de existencias y la caducidad dependen de un *trigger* en la base d
 
 ## Endpoints
 
-Todos los datos viajan en JSON. En las rutas que modifican una reserva hay que indicar el **documento del titular**; si no coincide con el de la reserva, la API responde `404` (no confirma que esa reserva exista).
+Todos los datos viajan en JSON. Todas las rutas de `/api/reservas` exigen sesión de Supabase: se envía `Authorization: Bearer <access_token>`. Sin token, o con un token inválido o vencido, la API responde `401`. Cada usuario solo puede ver, editar y cancelar **sus** reservas; si la reserva es de otra cuenta responde `404` (no confirma que exista).
 
 | Método | Ruta | Qué hace |
 |---|---|---|
 | `GET` | `/health` | Estado de la API |
-| `GET` | `/api/reservas?documento=…&estado=…` | Lista las reservas de un documento. `estado` es opcional |
-| `GET` | `/api/reservas/:id?documento=…` | Devuelve una reserva |
+| `GET` | `/api/reservas/mias?estado=…` | Lista las reservas de la cuenta con sesión. `estado` es opcional |
+| `GET` | `/api/reservas/:id` | Devuelve una reserva propia |
 | `POST` | `/api/reservas` | Crea una reserva |
 | `POST` | `/api/reservas/lote` | Crea varias reservas "todo o nada" (el carrito) |
 | `PATCH` | `/api/reservas/:id` | Edita cantidad, correo o celular de una reserva activa |
-| `DELETE` | `/api/reservas/:id?documento=…` | Cancela una reserva activa (no la borra: cambia su estado a `eliminado`) |
+| `DELETE` | `/api/reservas/:id` | Cancela una reserva activa (no la borra: cambia su estado a `eliminado`) |
 
 ### Crear una reserva
 
@@ -99,8 +99,8 @@ Es **"todo o nada"**: si un producto no existe o no tiene stock, la API borra la
 ### Listar reservas
 
 ```
-GET /api/reservas?documento=123456789
-GET /api/reservas?documento=123456789&estado=activo
+GET /api/reservas/mias
+GET /api/reservas/mias?estado=activo
 ```
 
 `estado` puede ser `activo`, `exitoso` o `eliminado`. Cada reserva trae el producto asociado (`productos`: nombre, precio, imagen). Las más recientes van primero. Si no hay resultados, devuelve `[]`.
@@ -111,7 +111,6 @@ GET /api/reservas?documento=123456789&estado=activo
 
 ```json
 {
-  "documento": "123456789",
   "cantidad": 3,
   "celular": "3109999999"
 }
@@ -122,7 +121,7 @@ Se puede enviar cualquier combinación de `cantidad`, `correo` y `celular` (al m
 ### Cancelar una reserva
 
 ```
-DELETE /api/reservas/5?documento=123456789
+DELETE /api/reservas/5
 ```
 
 La reserva pasa a estado `eliminado`. Los datos se conservan en la base.
@@ -134,7 +133,7 @@ La reserva pasa a estado `eliminado`. Los datos se conservan en la base.
 | `200` | Consulta, edición o cancelación correcta |
 | `201` | Reserva creada |
 | `400` | Faltan campos, datos con formato inválido, `estado` no permitido o `:id` que no es un entero positivo |
-| `404` | Producto o reserva no encontrados, o el documento no coincide con el de la reserva |
+| `404` | Producto o reserva no encontrados, o la reserva pertenece a otra cuenta |
 | `409` | No hay existencias suficientes, o la reserva ya no está activa (entregada o cancelada) |
 | `502` | Supabase no respondió o rechazó la solicitud. El detalle se escribe en la consola de la API, no se devuelve al cliente |
 
@@ -185,7 +184,7 @@ El trigger bloquea la fila del producto mientras actúa, así que **dos personas
 ```
 src/
 ├── server.js                   Carga el .env, levanta el servidor y arranca la caducidad
-├── app.js                      Rutas, validación de datos y reglas (propiedad por documento, solo reservas activas)
+├── app.js                      Rutas, validación de datos y reglas (propiedad por usuario, solo reservas activas)
 ├── supabase.js                 Acceso a Supabase con la clave service_role
 └── jobs/expireReservations.js  Caducidad periódica de reservas
 supabase/migrations/            SQL que se ejecuta en Supabase (trigger de existencias)
@@ -208,7 +207,7 @@ Usan `node --test` con un repositorio simulado: **no necesitan Supabase ni clave
 - **Hay que aplicar la migración SQL** en cada base de datos. Sin ella la API funciona, pero no descuenta stock ni caduca reservas.
 - **Las reservas anteriores a la migración no descontaron stock.** Hay un bloque opcional al final del `.sql` para corregirlo una vez.
 - **La caducidad solo corre mientras la API está encendida.** Al volver a arrancar se ponen al día.
-- **Sin autenticación:** el documento actúa como identificador y no como credencial. Sirve para una demostración, pero no para producción.
+- **Reservas anteriores a las cuentas** no tienen `user_id`, así que no se pueden consultar desde la API.
 - No envía correos de confirmación.
 
 ## Problemas frecuentes

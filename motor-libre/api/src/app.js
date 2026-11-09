@@ -1,6 +1,6 @@
 import cors from "cors";
 import express from "express";
-import { reservationsRepository } from "./supabase.js";
+import { reservationsRepository, verifyAccessToken } from "./supabase.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const REQUIRED_TEXT_FIELDS = ["nombre", "documento", "tipoDocumento", "correo", "celular"];
@@ -135,7 +135,15 @@ function parseReservationUpdate(body) {
   return errors.length > 0 ? { errors } : { fields };
 }
 
-export function createApp(repository = reservationsRepository) {
+// Asocia la reserva a la cuenta autenticada.
+function withOwner(reservation, user) {
+  return { ...reservation, userId: user.id };
+}
+
+export function createApp(
+  repository = reservationsRepository,
+  { verifyToken = verifyAccessToken } = {},
+) {
   const app = express();
   const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
     .split(",")
@@ -156,25 +164,55 @@ export function createApp(repository = reservationsRepository) {
   );
   app.use(express.json());
 
+  // Autenticación con Supabase Auth: si llega "Authorization: Bearer <token>" se valida
+  // y el usuario queda en request.user. Un token inválido es un 401. Las rutas de
+  // /api/reservas exigen usuario (ver más abajo).
+  app.use(async (request, response, next) => {
+    const header = request.headers.authorization;
+    if (!header) {
+      next();
+      return;
+    }
+
+    const match = /^Bearer\s+(.+)$/i.exec(header);
+    try {
+      const user = match ? await verifyToken(match[1]) : null;
+      if (!user) {
+        response.status(401).json({ error: "Sesión inválida o expirada. Inicia sesión de nuevo." });
+        return;
+      }
+      request.user = user;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  function requireUser(request, response, next) {
+    if (!request.user) {
+      response.status(401).json({ error: "Debes iniciar sesión para continuar." });
+      return;
+    }
+    next();
+  }
+
   app.get("/health", (_request, response) => {
     response.json({ status: "ok" });
   });
 
-  // Carga la reserva y valida que pertenezca al documento indicado.
+  // Todas las rutas de reservas exigen sesión.
+  app.use("/api/reservas", requireUser);
+
+  // Carga la reserva y valida que pertenezca al usuario con sesión.
   // Responde con el error HTTP correspondiente y devuelve null si no es válida.
-  async function loadOwnedReservation(request, response, documento, { requireActive }) {
+  async function loadOwnedReservation(request, response, { requireActive }) {
     if (!/^[1-9]\d*$/.test(request.params.id)) {
       response.status(400).json({ error: "El id debe ser un entero positivo." });
       return null;
     }
 
-    if (typeof documento !== "string" || documento.trim() === "") {
-      response.status(400).json({ error: "El parámetro 'documento' es obligatorio." });
-      return null;
-    }
-
     const reservation = await repository.findById(Number(request.params.id));
-    if (!reservation || reservation.documento !== documento.trim()) {
+    if (!reservation || reservation.user_id !== request.user.id) {
       response.status(404).json({ error: "Reserva no encontrada." });
       return null;
     }
@@ -187,9 +225,26 @@ export function createApp(repository = reservationsRepository) {
     return reservation;
   }
 
+  // Reservas de la cuenta que inició sesión.
+  app.get("/api/reservas/mias", async (request, response, next) => {
+    const estado = request.query.estado;
+    if (estado !== undefined && !VALID_ESTADOS.includes(estado)) {
+      response.status(400).json({
+        error: `El parámetro 'estado' debe ser uno de: ${VALID_ESTADOS.join(", ")}.`,
+      });
+      return;
+    }
+
+    try {
+      response.json(await repository.list({ userId: request.user.id, estado }));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/reservas/:id", async (request, response, next) => {
     try {
-      const reservation = await loadOwnedReservation(request, response, request.query.documento, {
+      const reservation = await loadOwnedReservation(request, response, {
         requireActive: false,
       });
       if (reservation) {
@@ -204,7 +259,7 @@ export function createApp(repository = reservationsRepository) {
     const body = request.body ?? {};
 
     try {
-      const reservation = await loadOwnedReservation(request, response, body.documento, {
+      const reservation = await loadOwnedReservation(request, response, {
         requireActive: true,
       });
       if (!reservation) {
@@ -241,7 +296,7 @@ export function createApp(repository = reservationsRepository) {
 
   app.delete("/api/reservas/:id", async (request, response, next) => {
     try {
-      const reservation = await loadOwnedReservation(request, response, request.query.documento, {
+      const reservation = await loadOwnedReservation(request, response, {
         requireActive: true,
       });
       if (!reservation) {
@@ -250,31 +305,6 @@ export function createApp(repository = reservationsRepository) {
 
       const cancelled = await repository.update(reservation.id_reserva, { estado: "eliminado" });
       response.json(cancelled);
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.get("/api/reservas", async (request, response, next) => {
-    const documento =
-      typeof request.query.documento === "string" ? request.query.documento.trim() : "";
-
-    if (documento === "") {
-      response.status(400).json({ error: "El parámetro 'documento' es obligatorio." });
-      return;
-    }
-
-    const estado = request.query.estado;
-    if (estado !== undefined && !VALID_ESTADOS.includes(estado)) {
-      response.status(400).json({
-        error: `El parámetro 'estado' debe ser uno de: ${VALID_ESTADOS.join(", ")}.`,
-      });
-      return;
-    }
-
-    try {
-      const reservations = await repository.list({ documento, estado });
-      response.json(reservations);
     } catch (error) {
       next(error);
     }
@@ -289,7 +319,7 @@ export function createApp(repository = reservationsRepository) {
     }
 
     try {
-      const created = await repository.create(reservation);
+      const created = await repository.create(withOwner(reservation, request.user));
       response.status(201).json(created);
     } catch (error) {
       if (!respondDomainError(error, response)) {
@@ -312,7 +342,7 @@ export function createApp(repository = reservationsRepository) {
 
     try {
       for (const reservation of reservations) {
-        created.push(await repository.create(reservation));
+        created.push(await repository.create(withOwner(reservation, request.user)));
       }
 
       response.status(201).json(created);

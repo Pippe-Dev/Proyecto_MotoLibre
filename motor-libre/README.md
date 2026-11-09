@@ -36,6 +36,8 @@ Archivo `.env` (se crea copiando `.env.example`). Las variables de Vite deben em
 |---|---|---|
 | `VITE_PRODUCTS_API_URL` | `http://localhost:3000/api` | Dirección de la API de productos |
 | `VITE_RESERVATIONS_API_URL` | `http://localhost:3001/api` | Dirección de la API de reservas |
+| `VITE_SUPABASE_URL` | (ninguno) | URL del proyecto de Supabase, para el inicio de sesión |
+| `VITE_SUPABASE_ANON_KEY` | (ninguno) | Clave pública (anon/publishable) de Supabase. **Nunca** la service role |
 
 Si no defines una variable, se usa el valor por defecto de la tabla, que corresponde a ejecutar todo en tu equipo. Para desplegar, apunta estas dos variables a las direcciones públicas de las APIs.
 
@@ -54,6 +56,15 @@ Las rutas están definidas en [`src/App.tsx`](src/App.tsx).
 | `/reservas` | `pages/reservationsLookupPage.tsx` | Consulta, edición y cancelación de reservas |
 | `/contacto` | `pages/contactPage.tsx` | Datos de contacto, horario y pasos para reservar |
 | `*` | `pages/notFoundPage.tsx` | Página 404 |
+
+## Cuentas y novedades
+
+- **Autenticación con Supabase Auth**: registro, inicio de sesión, recuperación y cambio de contraseña (`/login`, `/registro`, `/recuperar`, `/restablecer`) y perfil (`/perfil`). Sin las variables `VITE_SUPABASE_*` la tienda sigue funcionando como invitado.
+- **Mis reservas**: requiere sesión y se listan solas (`GET /api/reservas/mias`). Reservar también exige iniciar sesión.
+- **Datos precargados**: las reservas toman nombre, documento, correo y celular del perfil.
+- **Favoritos** (`/favoritos`, guardados en el navegador), **modo oscuro**, **notificaciones** y, en el catálogo, **búsqueda, orden y filtro de disponibles**.
+
+Configuración en Supabase: Authentication -> URL Configuration -> añade `http://localhost:5173/restablecer` a *Redirect URLs*, y aplica `api/supabase/migrations/20261109000000_reservas_usuario.sql` en el SQL Editor.
 
 ## Estructura de `src/`
 
@@ -89,7 +100,7 @@ Los componentes nunca llaman a `fetch` directamente: siempre pasan por estos arc
 Es un contexto de React que comparte el carrito con toda la aplicación. Guarda en el navegador **solo el id y la cantidad** de cada producto, no el producto completo, así que al recargar vuelve a pedir los datos actualizados a la API.
 
 ### Reservas (`components/reservations/`)
-- `reservationsLookup.tsx`: formulario de búsqueda por documento y estado, resumen y lista de resultados.
+- `accountReservations.tsx`: reservas de la cuenta con filtro por estado, resumen y lista.
 - `reservationCard.tsx`: tarjeta de cada reserva. Si está activa, permite **editar** (cantidad, celular, correo) y **cancelar** con confirmación. Actualiza la tarjeta en pantalla sin repetir la búsqueda.
 - `reservationsLookup.css`: estilos del módulo.
 

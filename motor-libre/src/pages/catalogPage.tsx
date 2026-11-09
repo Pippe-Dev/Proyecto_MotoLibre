@@ -1,10 +1,15 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import type { Product } from "../types/detailedProduct";
 import { getProducts } from "../service/productService";
+import { ProductCard } from "../components/product/productCard";
+
+type SortOption = "default" | "price-asc" | "price-desc" | "name";
 
 export function CatalogPage() {
+  const [search, setSearch] = useState("");
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [sort, setSort] = useState<SortOption>("default");
   const [products, setProducts] = useState<Product[] | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [brand, setBrand] = useState("");
@@ -51,6 +56,26 @@ export function CatalogPage() {
     [allProducts, brand]
   );
 
+  // Búsqueda, disponibilidad y orden se aplican en el cliente sobre lo ya cargado.
+  const visibleProducts = useMemo(() => {
+    if (!products) return null;
+
+    const term = search.trim().toLowerCase();
+    const filtered = products.filter(
+      (product) =>
+        (!onlyAvailable || product.stock > 0) &&
+        (term === "" ||
+          `${product.name} ${product.brand} ${product.model}`
+            .toLowerCase()
+            .includes(term))
+    );
+
+    if (sort === "price-asc") return [...filtered].sort((a, b) => a.price - b.price);
+    if (sort === "price-desc") return [...filtered].sort((a, b) => b.price - a.price);
+    if (sort === "name") return [...filtered].sort((a, b) => a.name.localeCompare(b.name, "es"));
+    return filtered;
+  }, [products, search, onlyAvailable, sort]);
+
   const applyFilters = async (selectedBrand: string, selectedModel: string) => {
     setError(false);
     setProducts(null);
@@ -78,6 +103,9 @@ export function CatalogPage() {
   };
 
   const clearFilters = () => {
+    setSearch("");
+    setOnlyAvailable(false);
+    setSort("default");
     setBrand("");
     setModel("");
     void applyFilters("", "");
@@ -136,15 +164,63 @@ export function CatalogPage() {
           </select>
         </div>
 
+        <div className="catalog-filter">
+          <label htmlFor="sort-filter">Ordenar por</label>
+          <select
+            id="sort-filter"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as SortOption)}
+          >
+            <option value="default">Relevancia</option>
+            <option value="price-asc">Precio: menor a mayor</option>
+            <option value="price-desc">Precio: mayor a menor</option>
+            <option value="name">Nombre (A-Z)</option>
+          </select>
+        </div>
+
         <button
           type="button"
           className="catalog-filter__clear"
           onClick={clearFilters}
-          disabled={!brand && !model}
+          disabled={!brand && !model && !search && !onlyAvailable && sort === "default"}
         >
           Limpiar filtros
         </button>
       </section>
+
+      <div className="catalog-toolbar">
+        <div className="catalog-search">
+          <i className="bi bi-search" aria-hidden="true" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por nombre, marca o modelo..."
+            aria-label="Buscar productos"
+          />
+        </div>
+
+        <div className="form-check form-switch">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            role="switch"
+            id="only-available"
+            checked={onlyAvailable}
+            onChange={(event) => setOnlyAvailable(event.target.checked)}
+          />
+          <label className="form-check-label" htmlFor="only-available">
+            Solo disponibles
+          </label>
+        </div>
+
+        {visibleProducts && (
+          <span className="catalog-toolbar__count" role="status">
+            {visibleProducts.length}{" "}
+            {visibleProducts.length === 1 ? "producto" : "productos"}
+          </span>
+        )}
+      </div>
 
       <div className="product-grid" aria-busy={!products}>
         {!products &&
@@ -152,41 +228,11 @@ export function CatalogPage() {
             <div key={n} className="skeleton skeleton--card" />
           ))}
 
-        {products?.map((product) => (
-          <Link
-            key={product.id}
-            to={`/producto/${product.id}`}
-            className={
-              product.stock === 0
-                ? "product-card product-card--soldout"
-                : "product-card"
-            }
-          >
-            <div className="product-card__image">
-              <img
-                src={product.images[0] || "/images/sin-imagen.svg"}
-                alt={product.name}
-                referrerPolicy="no-referrer"
-                onError={(event) => {
-                  event.currentTarget.onerror = null;
-                  event.currentTarget.src = "/images/sin-imagen.svg";
-                }}
-              />
-            </div>
-
-            <div className="product-card__body">
-              <h2 className="product-card__name">{product.name}</h2>
-              <p className="product-card__price">
-                ${product.price.toLocaleString("es-CO")}
-              </p>
-              {product.stock === 0 && (
-                <span className="product-card__tag">Agotado</span>
-              )}
-            </div>
-          </Link>
+        {visibleProducts?.map((product) => (
+          <ProductCard key={product.id} product={product} />
         ))}
 
-        {products?.length === 0 && (
+        {visibleProducts?.length === 0 && (
           <p>No se encontraron productos con los filtros seleccionados.</p>
         )}
       </div>

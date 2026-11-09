@@ -1,7 +1,12 @@
 import { useState } from "react";
+import type { User } from "@supabase/supabase-js";
 
 import type { CartItem } from "../../types/cart";
 import { createReservationsBatch } from "../../service/reservationService";
+import { DOCUMENT_TYPES } from "../../constants/documentTypes";
+import { useAuth } from "../../context/authContext";
+import type { ProfileData } from "../../context/authContext";
+import { useToast } from "../../context/toastContext";
 
 interface CartReservationModalProps {
   cartItems: CartItem[];
@@ -9,13 +14,6 @@ interface CartReservationModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-const DOCUMENT_TYPES = [
-  { value: "CC", label: "Cédula de ciudadanía" },
-  { value: "CE", label: "Cédula de extranjería" },
-  { value: "TI", label: "Tarjeta de identidad" },
-  { value: "PA", label: "Pasaporte" },
-];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -27,13 +25,14 @@ interface FormState {
   celular: string;
 }
 
-function getInitialState(): FormState {
+// Con sesión iniciada el formulario arranca con los datos del perfil.
+function getInitialState(user: User | null, profile: ProfileData): FormState {
   return {
-    nombre: "",
-    documento: "",
-    tipoDocumento: DOCUMENT_TYPES[0].value,
-    correo: "",
-    celular: "",
+    nombre: profile.nombre ?? "",
+    documento: profile.documento ?? "",
+    tipoDocumento: profile.tipoDocumento ?? DOCUMENT_TYPES[0].value,
+    correo: user?.email ?? "",
+    celular: profile.celular ?? "",
   };
 }
 
@@ -43,7 +42,9 @@ export function CartReservationModal({
   onClose,
   onSuccess,
 }: CartReservationModalProps) {
-  const [form, setForm] = useState<FormState>(getInitialState);
+  const { user, profile } = useAuth();
+  const { showToast } = useToast();
+  const [form, setForm] = useState<FormState>(() => getInitialState(user, profile));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -53,7 +54,7 @@ export function CartReservationModal({
   }
 
   const handleClose = () => {
-    setForm(getInitialState());
+    setForm(getInitialState(user, profile));
     setError(null);
     setSuccess(false);
     onClose();
@@ -94,6 +95,7 @@ export function CartReservationModal({
       });
 
       setSuccess(true);
+      showToast("Reserva registrada correctamente.", "success");
       onSuccess();
     } catch (caught) {
       setError(
