@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Product } from "../../types/detailedProduct";
 
 import { QuantitySelector } from "./quantitySelector";
+import { useRequireLogin } from "../../hooks/useRequireLogin";
 import { ReservationModal } from "./reservationModal";
 import { useCart } from "../../context/cartContext";
 
@@ -19,6 +20,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
   const [quantity, setQuantity] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showReservation, setShowReservation] = useState(false);
+  const requireLogin = useRequireLogin();
 
   const timeoutRef = useRef<number | undefined>(undefined);
 
@@ -99,7 +101,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
         <button
           type="button"
           className="btn btn-outline-primary btn-add-cart bi bi-bookmark-check mt-3"
-          onClick={() => setShowReservation(true)}
+          onClick={() => requireLogin() && setShowReservation(true)}
         >
           RESERVAR
         </button>

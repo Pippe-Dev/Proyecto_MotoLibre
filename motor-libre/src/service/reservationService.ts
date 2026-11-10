@@ -4,43 +4,27 @@ import type {
   ReservationUpdateInput,
 } from "../types/reservation";
 import type { ReservationRecord } from "../types/reservationRecord";
+import { getAccessToken } from "../lib/supabaseClient";
 
 const API_URL =
   import.meta.env.VITE_RESERVATIONS_API_URL ?? "http://localhost:3001/api";
 
-export async function createReservation(
-  input: ReservationInput
-): Promise<void> {
-  const response = await fetch(`${API_URL}/reservas`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+// Si hay sesión de Supabase, la API recibe el token y asocia/valida las reservas
+// con la cuenta. Sin sesión se sigue funcionando como invitado.
+async function buildHeaders(withJson: boolean, useSession = true): Promise<HeadersInit> {
+  const headers: Record<string, string> = {};
 
-  if (!response.ok) {
-    throw new Error("No se pudo registrar la reserva");
+  if (withJson) {
+    headers["Content-Type"] = "application/json";
   }
+
+  const token = useSession ? await getAccessToken() : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
 }
-
-export async function getReservationsByDocumento(
-  documento: string,
-  estado?: string
-): Promise<ReservationRecord[]> {
-  const params = new URLSearchParams({ documento });
-
-  if (estado) {
-    params.set("estado", estado);
-  }
-
-  const response = await fetch(`${API_URL}/reservas?${params.toString()}`);
-
-  if (!response.ok) {
-    throw new Error("No se pudieron consultar las reservas");
-  }
-
-  return response.json();
-}
-
 
 async function readApiError(response: Response, fallback: string): Promise<Error> {
   try {
@@ -54,15 +38,51 @@ async function readApiError(response: Response, fallback: string): Promise<Error
   return new Error(fallback);
 }
 
+export async function createReservation(
+  input: ReservationInput
+): Promise<void> {
+  const response = await fetch(`${API_URL}/reservas`, {
+    method: "POST",
+    headers: await buildHeaders(true),
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw await readApiError(response, "No se pudo registrar la reserva");
+  }
+}
+
+// Reservas de la cuenta con sesión iniciada.
+export async function getMyReservations(estado?: string): Promise<ReservationRecord[]> {
+  const params = new URLSearchParams();
+
+  if (estado) {
+    params.set("estado", estado);
+  }
+
+  const query = params.toString();
+  const response = await fetch(`${API_URL}/reservas/mias${query ? `?${query}` : ""}`, {
+    headers: await buildHeaders(false),
+  });
+
+  if (!response.ok) {
+    throw await readApiError(response, "No se pudieron consultar las reservas");
+  }
+
+  return response.json();
+}
+
+// `documento` null = la reserva pertenece a la cuenta (se identifica con el token);
+// con un documento se actúa como invitado.
 export async function updateReservation(
   id: number,
-  documento: string,
+  documento: string | null,
   changes: ReservationUpdateInput
 ): Promise<ReservationRecord> {
   const response = await fetch(`${API_URL}/reservas/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ documento, ...changes }),
+    headers: await buildHeaders(true, documento === null),
+    body: JSON.stringify(documento === null ? changes : { documento, ...changes }),
   });
 
   if (!response.ok) {
@@ -74,11 +94,12 @@ export async function updateReservation(
 
 export async function cancelReservation(
   id: number,
-  documento: string
+  documento: string | null
 ): Promise<ReservationRecord> {
-  const params = new URLSearchParams({ documento });
-  const response = await fetch(`${API_URL}/reservas/${id}?${params.toString()}`, {
+  const query = documento === null ? "" : `?${new URLSearchParams({ documento }).toString()}`;
+  const response = await fetch(`${API_URL}/reservas/${id}${query}`, {
     method: "DELETE",
+    headers: await buildHeaders(false, documento === null),
   });
 
   if (!response.ok) {
@@ -95,7 +116,7 @@ export async function createReservationsBatch(
 ): Promise<ReservationRecord[]> {
   const response = await fetch(`${API_URL}/reservas/lote`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await buildHeaders(true),
     body: JSON.stringify(input),
   });
 

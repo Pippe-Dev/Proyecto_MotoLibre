@@ -2,19 +2,16 @@ import { useState } from "react";
 
 import type { Product } from "../../types/detailedProduct";
 import { createReservation } from "../../service/reservationService";
+import { DOCUMENT_TYPES } from "../../constants/documentTypes";
+import { useAuth } from "../../context/authContext";
+import type { ProfileData } from "../../context/authContext";
+import { useToast } from "../../context/toastContext";
 
 interface ReservationModalProps {
   product: Product;
   show: boolean;
   onClose: () => void;
 }
-
-const DOCUMENT_TYPES = [
-  { value: "CC", label: "Cédula de ciudadanía" },
-  { value: "CE", label: "Cédula de extranjería" },
-  { value: "TI", label: "Tarjeta de identidad" },
-  { value: "PA", label: "Pasaporte" },
-];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -27,19 +24,22 @@ interface FormState {
   cantidad: number;
 }
 
-function getInitialState(): FormState {
+function getInitialState(email: string, profile: ProfileData): FormState {
   return {
-    nombre: "",
-    documento: "",
-    tipoDocumento: DOCUMENT_TYPES[0].value,
-    correo: "",
-    celular: "",
+    nombre: profile.nombre ?? "",
+    documento: profile.documento ?? "",
+    tipoDocumento: profile.tipoDocumento ?? DOCUMENT_TYPES[0].value,
+    correo: email,
+    celular: profile.celular ?? "",
     cantidad: 1,
   };
 }
 
 export function ReservationModal({ product, show, onClose }: ReservationModalProps) {
-  const [form, setForm] = useState<FormState>(getInitialState);
+  const { user, profile } = useAuth();
+  const { showToast } = useToast();
+  const email = user?.email ?? "";
+  const [form, setForm] = useState<FormState>(() => getInitialState(email, profile));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -49,7 +49,7 @@ export function ReservationModal({ product, show, onClose }: ReservationModalPro
   }
 
   const handleClose = () => {
-    setForm(getInitialState());
+    setForm(getInitialState(email, profile));
     setError(null);
     setSuccess(false);
     onClose();
@@ -93,8 +93,13 @@ export function ReservationModal({ product, show, onClose }: ReservationModalPro
       });
 
       setSuccess(true);
-    } catch {
-      setError("No se pudo registrar la reserva. Inténtalo de nuevo.");
+      showToast("Reserva registrada correctamente.", "success");
+    } catch (caught) {
+      setError(
+        caught instanceof Error && caught.message
+          ? caught.message
+          : "No se pudo registrar la reserva. Inténtalo de nuevo."
+      );
     } finally {
       setSubmitting(false);
     }

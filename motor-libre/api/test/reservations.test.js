@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { createApp } from "../src/app.js";
 
+// Las rutas de reservas exigen sesión: los tests envían un token de prueba por defecto.
+const fakeVerifyToken = async (token) => (token === "test" ? { id: "test-user", email: "t@t.co" } : null);
+const realFetch = globalThis.fetch;
+globalThis.fetch = (url, options = {}) =>
+  String(url).includes("/api/reservas") && !options.headers?.Authorization
+    ? realFetch(url, { ...options, headers: { ...options.headers, Authorization: "Bearer test" } })
+    : realFetch(url, options);
+
 const validPayload = {
   nombre: "Juana Pérez",
   documento: "123456789",
@@ -35,7 +43,7 @@ before(async () => {
     },
   };
 
-  server = createApp(repository).listen(0);
+  server = createApp(repository, { verifyToken: fakeVerifyToken }).listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 });
@@ -55,7 +63,7 @@ test("POST /api/reservas crea una reserva con datos válidos", async () => {
 
   assert.equal(response.status, 201);
   assert.deepEqual(await response.json(), createdReservation);
-  assert.deepEqual(calls.at(-1), validPayload);
+  assert.deepEqual(calls.at(-1), { ...validPayload, userId: "test-user" });
 });
 
 test("POST /api/reservas rechaza campos obligatorios faltantes", async () => {
@@ -100,7 +108,7 @@ test("POST /api/reservas propaga producto no encontrado como 404", async () => {
     },
   };
 
-  const notFoundServer = createApp(repository).listen(0);
+  const notFoundServer = createApp(repository, { verifyToken: fakeVerifyToken }).listen(0);
   await new Promise((resolve) => notFoundServer.once("listening", resolve));
   const notFoundBaseUrl = `http://127.0.0.1:${notFoundServer.address().port}`;
 
@@ -126,7 +134,7 @@ test("POST /api/reservas propaga existencias insuficientes como 409", async () =
     },
   };
 
-  const conflictServer = createApp(repository).listen(0);
+  const conflictServer = createApp(repository, { verifyToken: fakeVerifyToken }).listen(0);
   await new Promise((resolve) => conflictServer.once("listening", resolve));
   const conflictBaseUrl = `http://127.0.0.1:${conflictServer.address().port}`;
 
@@ -143,25 +151,25 @@ test("POST /api/reservas propaga existencias insuficientes como 409", async () =
   });
 });
 
-test("GET /api/reservas exige el parámetro documento", async () => {
-  const response = await fetch(`${baseUrl}/api/reservas`);
+test("GET /api/reservas/mias rechaza un estado inválido", async () => {
+  const response = await fetch(`${baseUrl}/api/reservas/mias?estado=pagado`);
   assert.equal(response.status, 400);
 });
 
-test("GET /api/reservas rechaza un estado inválido", async () => {
-  const response = await fetch(`${baseUrl}/api/reservas?documento=123&estado=pagado`);
-  assert.equal(response.status, 400);
-});
-
-test("GET /api/reservas devuelve las reservas del documento", async () => {
-  const response = await fetch(`${baseUrl}/api/reservas?documento=123456789&estado=activo`);
+test("GET /api/reservas/mias devuelve las reservas del usuario", async () => {
+  const response = await fetch(`${baseUrl}/api/reservas/mias?estado=activo`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), listedReservations);
-  assert.deepEqual(listCalls.at(-1), { documento: "123456789", estado: "activo" });
+  assert.deepEqual(listCalls.at(-1), { userId: "test-user", estado: "activo" });
+});
+
+test("GET /api/reservas (por documento) ya no existe", async () => {
+  const response = await fetch(`${baseUrl}/api/reservas?documento=123456789`);
+  assert.equal(response.status, 404);
 });
 
 async function withServer(repository, run) {
-  const instance = createApp(repository).listen(0);
+  const instance = createApp(repository, { verifyToken: fakeVerifyToken }).listen(0);
   await new Promise((resolve) => instance.once("listening", resolve));
   try {
     await run(`http://127.0.0.1:${instance.address().port}`);
@@ -174,6 +182,7 @@ async function withServer(repository, run) {
 
 const activeReservation = {
   id_reserva: 5,
+  user_id: "test-user",
   ...validPayload,
   tipo_documento: "CC",
   id_producto: 7,
@@ -192,7 +201,7 @@ test("DELETE /api/reservas/:id cancela una reserva activa y notifica", async () 
   };
 
   await withServer(repository, async (url) => {
-    const response = await fetch(`${url}/api/reservas/5?documento=123456789`, { method: "DELETE" });
+    const response = await fetch(`${url}/api/reservas/5`, { method: "DELETE" });
     assert.equal(response.status, 200);
     assert.equal((await response.json()).estado, "eliminado");
   });
@@ -200,11 +209,11 @@ test("DELETE /api/reservas/:id cancela una reserva activa y notifica", async () 
   assert.deepEqual(updates, [{ id: 5, fields: { estado: "eliminado" } }]);
 });
 
-test("DELETE /api/reservas/:id no revela reservas de otro documento", async () => {
-  const repository = { async findById() { return activeReservation; } };
+test("DELETE /api/reservas/:id no revela reservas de otro usuario", async () => {
+  const repository = { async findById() { return { ...activeReservation, user_id: "otro" }; } };
 
   await withServer(repository, async (url) => {
-    const response = await fetch(`${url}/api/reservas/5?documento=999`, { method: "DELETE" });
+    const response = await fetch(`${url}/api/reservas/5`, { method: "DELETE" });
     assert.equal(response.status, 404);
   });
 });
@@ -213,7 +222,7 @@ test("DELETE /api/reservas/:id rechaza reservas que ya no están activas", async
   const repository = { async findById() { return { ...activeReservation, estado: "exitoso" }; } };
 
   await withServer(repository, async (url) => {
-    const response = await fetch(`${url}/api/reservas/5?documento=123456789`, { method: "DELETE" });
+    const response = await fetch(`${url}/api/reservas/5`, { method: "DELETE" });
     assert.equal(response.status, 409);
   });
 });
@@ -232,7 +241,7 @@ test("PATCH /api/reservas/:id actualiza cantidad y contacto", async () => {
     const response = await fetch(`${url}/api/reservas/5`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ documento: "123456789", cantidad: 3, celular: " 3109999999 " }),
+      body: JSON.stringify({ cantidad: 3, celular: " 3109999999 " }),
     });
     assert.equal(response.status, 200);
   });
@@ -248,7 +257,7 @@ test("PATCH /api/reservas/:id valida existencias y datos", async () => {
       fetch(`${url}/api/reservas/5`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documento: "123456789", ...body }),
+        body: JSON.stringify(body),
       });
 
     assert.equal((await send({ cantidad: 10 })).status, 409);
@@ -397,4 +406,81 @@ test("PATCH /api/reservas/:id solo exige stock para el aumento, no la cantidad t
   });
 
   assert.deepEqual(updates, [{ cantidad: 5 }]);
+});
+
+async function startApp(repository, verifyToken) {
+  const instance = createApp(repository, { verifyToken }).listen(0);
+  await new Promise((resolve) => instance.once("listening", resolve));
+  return {
+    url: `http://127.0.0.1:${instance.address().port}`,
+    close: () => new Promise((resolve) => instance.close(resolve)),
+  };
+}
+
+test("sin sesión, GET /api/reservas/mias responde 401", async () => {
+  const response = await realFetch(`${baseUrl}/api/reservas/mias`);
+  assert.equal(response.status, 401);
+});
+
+test("un token inválido responde 401", async () => {
+  const app = await startApp({}, async () => null);
+  const response = await fetch(`${app.url}/api/reservas/mias`, {
+    headers: { Authorization: "Bearer malo" },
+  });
+  assert.equal(response.status, 401);
+  await app.close();
+});
+
+test("con sesión, las reservas se asocian al usuario y /mias lista las suyas", async () => {
+  const created = [];
+  const listed = [];
+  const repository = {
+    async create(reservation) {
+      created.push(reservation);
+      return { id_reserva: 9, ...reservation };
+    },
+    async list(filters) {
+      listed.push(filters);
+      return [];
+    },
+    async findById() {
+      return { id_reserva: 9, user_id: "otro", documento: "123456789", estado: "activo" };
+    },
+  };
+  const app = await startApp(repository, async (token) =>
+    token === "ok" ? { id: "user-1", email: "a@b.co" } : null,
+  );
+  const headers = { "Content-Type": "application/json", Authorization: "Bearer ok" };
+
+  const post = await fetch(`${app.url}/api/reservas`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(validPayload),
+  });
+  assert.equal(post.status, 201);
+  assert.equal(created.at(-1).userId, "user-1");
+
+  const mine = await fetch(`${app.url}/api/reservas/mias?estado=activo`, { headers });
+  assert.equal(mine.status, 200);
+  assert.deepEqual(listed.at(-1), { userId: "user-1", estado: "activo" });
+
+  // Una reserva de otro usuario no se puede cancelar aunque se conozca el documento.
+  const del = await fetch(`${app.url}/api/reservas/9`, {
+    method: "DELETE",
+    headers,
+  });
+  assert.equal(del.status, 404);
+
+  await app.close();
+});
+
+test("crear reservas sin sesión responde 401", async () => {
+  for (const path of ["/api/reservas", "/api/reservas/lote"]) {
+    const response = await realFetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validPayload),
+    });
+    assert.equal(response.status, 401);
+  }
 });
